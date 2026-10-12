@@ -1,61 +1,86 @@
-# HHH IM 插件模板
+# Slack（HHH IM 插件）
 
-给 HHH 写一个 IM 插件的起点：清单、标志、能跑的插件骨架、打包脚本、给 agent 的规范，都在这里。
+HHH 的 Slack 插件：在 HHH 里看 Slack 的频道、私聊、群私聊与话题，回消息、发图片和文件、编辑、撤回、点表情回应。
 
-HHH 的 IM 层只做统一的界面和一个统一的插座（HHH-IM-Protocol）。插件是一个子进程：和自己的平台说话、把平台的格式翻成统一格式、
-声明自己能做什么和要用户填什么；聊天记录、凭据、配置都交给 HHH。
+它是从 HHH 内置的 Slack 搬出来的独立插件，从 [HHH IM 插件模板](https://github.com/MagicLizi/hhh-im-plugin-template) 起，走 HHH 的
+统一插座 HHH-IM-Protocol v1。界面、登录和各种说明文字都和内置时一样，本机已经存下的聊天记录和头像照样能用。装上后会接过内置
+Slack 的登录，不用重新登录。
 
-## 五分钟起一个插件
+## 能做什么
 
-1. 用这个模板建仓库（GitHub 上点 “Use this template”），克隆下来。
-2. 装工具（自检与打包）：
+- **登录**：点“登录”直接打开 Slack 的授权页（HHH 的 Slack 应用，经授权回调中继领回授权码，本机用 PKCE 换令牌，不要 Client Secret），
+  不用填任何东西。卡片写“名字 · 工作区”；缺权限时卡片下面写缺哪几项、点重新登录补上。
+- **续期**：登录快过期时自动续期，Slack 的刷新令牌只能用一次，换到的新授权先交给 HHH 存好再用。HHH 没在用这个插件时，也会按时叫它续期。
+- **读取**：会话列表、搜频道、搜人、找私聊、成员、最近聊过的会话（新版搜索）、消息与话题、表情回应、人员与机器人的资料。
+- **内容**：文字、提及（人、用户组、`@here`、`@channel`）、格式正文（mrkdwn 与 rich_text）、卡片（Block Kit 与旧版附件、链接预览）、
+  图片、文件、视频封面、工作区自定义表情。
+- **发送与动作**：在话题里回复、同时发到频道、@某人与 @所有人、发图片和文件、编辑、撤回、加表情回应、去掉表情回应。
+- **资源**：图片、文件、头像、表情图都分段交给 HHH。
 
-   ```sh
-   cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.4.0 hhh-im-protocol --features transport,package
-   ```
+聊天记录、凭据和配置都由 HHH 保存，插件自己不存。
 
-3. 改清单 `hhh-im-provider.json`：`id`（发布后不能改）、`name`、`publisher`、`source`（换成你的仓库）。
-4. 打包并自检：
+## 构建
 
-   ```sh
-   powershell -File scripts/pack.ps1     # Windows
-   scripts/pack.sh                       # macOS / Linux
-   hhh-im-check dist/stage/hhh-im-provider.json
-   ```
+```sh
+cargo build --release
+cargo test
+cargo fmt --check
+cargo clippy --all-targets
+```
 
-5. 在 HHH 里试：设置 → IM → 添加 IM → 文件夹，选 `dist/stage`。会多一个“示例 IM”，里面一个示例群，发什么它回“收到「…」”。
+程序是 `target/release/hhh-im-slack`，Windows 上是 `hhh-im-slack.exe`。Windows 上按窗口程序编译，HHH 拉起它时不弹控制台窗口。
 
-然后照 `src/main.rs` 的注释和 `AGENTS.md` 换成你的平台。
+协议服务、日志、资源分段、上传与请求计数用协议包 `hhh-im-protocol` 的插件运行时（`runtime` 部件）。
 
-## 在 HHH 里怎么试
+## 自检
+
+装自检和打包工具：
+
+```sh
+cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.4.0 hhh-im-protocol --features transport,package
+```
+
+打包后自检，全部通过才算改好：
+
+```sh
+powershell -File scripts/pack.ps1
+hhh-im-check dist/stage/hhh-im-provider.json
+```
+
+## 在 HHH 里试
 
 | 方式 | 什么时候用 |
 |---|---|
-| 添加 IM → 文件夹 | 开发时：选 `dist/stage` 或你的插件文件夹 |
+| 设置 → IM → 添加 IM → 文件夹 | 开发时，选 `dist/stage` |
 | 添加 IM → 安装包 | 选 `dist/` 里的 `.hhhim`，和用户装的一样 |
-| 添加 IM → 仓库 | 发布后：填你的仓库地址，HHH 读最新版本、下载这台电脑的包 |
 | 卡片「管理 → 从文件更新」 | 已经装过，换成新打的包或文件夹 |
 
 ## 发版本
 
-1. 改清单与 `Cargo.toml` 的 `version`，写 `notes.md`（更新说明，Markdown）。
-2. 提交，打标签 `v<版本>` 推上去。
-3. 令牌放环境变量 `HHH_IM_PUBLISH_TOKEN`，跑 `scripts/pack.ps1 -Publish`（或 `scripts/pack.sh --publish`）。
+Slack 是官方插件：HHH 只认官方私钥签过名的版本索引。目前只发 Windows 的包（`windows-x64`）。
 
-用户打开 HHH 的设置 → IM 时会看到“有新版本”，点一下就更新。详细规矩见 [hhh-im-sdk 的发版本规范](https://github.com/MagicLizi/hhh-im-sdk/blob/main/docs/release.md)。
+1. 改清单 `hhh-im-provider.json` 和 `Cargo.toml` 里的 `version`，写好 `notes.md`（给用户看的更新说明）。
+2. 提交，打标签 `v<版本>`，推送提交和标签。
+3. 发布令牌放在环境变量 `HHH_IM_PUBLISH_TOKEN` 里。签名私钥在私有的密钥仓库 `hhh-keys` 里，**不进这个仓库**：
 
-## 给 agent 的规范
+   ```sh
+   powershell -File scripts/pack.ps1 -SignKey <hhh-keys>/official/hhh-official-signing.key -Publish
+   ```
 
-用任何 agent 打开这个仓库都按同一套规矩写插件：
+   打包工具写出 `.hhhim`、版本索引 `hhhim-release.json` 和签名 `hhhim-release.json.sig`，三样一起传到 GitHub Release。
 
-- `AGENTS.md`：规则正本（先读协议、清单怎么填、插件只做什么、改完必须自检并在 HHH 里试、怎么发版本）。
-- `CLAUDE.md`：只有一行，指到 `AGENTS.md`。
-- skill「开发插件」与「发版本」：`.agents/skills/` 与 `.claude/skills/`（内容相同）。
+详细规矩见 [hhh-im-sdk 的发版本规范](https://github.com/MagicLizi/hhh-im-sdk/blob/main/docs/release.md)。
 
-## 本仓库的版本
+## 仓库里有什么
 
-这个模板本身也按规范发布示例插件“示例 IM”的版本，可以在 HHH 里用「添加 IM → 仓库」填 `https://github.com/MagicLizi/hhh-im-plugin-template` 试装与更新。
+| 位置 | 内容 |
+|---|---|
+| `src/slack/` | 从 HHH 搬来的 Slack 适配器：Slack 接口、登录与续期、翻成协议的统一格式、各协议方法的做法 |
+| `src/server/` | 协议方法：握手声明、登录、续期、交接、读取与动作 |
+| `tests/fixtures/slack/` | Slack 响应的取样（人名、编号和内容都是编的） |
+| `tests/fixtures/slack-protocol/` | 协议样例：插件发给 HHH 的线上消息与握手结果。这些样例会拷进 HHH，用宿主真正的翻译再核对一遍 |
+| `scripts/pack.ps1` | 打包与发布 |
 
 ## 许可证
 
-[MIT](LICENSE)。用这个模板起的插件，许可证由你自己定（改掉 `LICENSE` 与 `Cargo.toml` 的 `license`）。
+[MIT](LICENSE)

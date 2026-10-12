@@ -1,0 +1,137 @@
+{
+  "capabilities": {
+    "conversations": {
+      "findDirect": true,
+      "list": true,
+      "members": true,
+      "recentActivity": true,
+      "search": true
+    },
+    "edit": true,
+    "events": {
+      "conversations": false,
+      "deletions": false,
+      "messages": false,
+      "people": false,
+      "reactions": false
+    },
+    "messages": {
+      "get": true,
+      "list": true
+    },
+    "people": {
+      "batchMax": 2000,
+      "bots": true,
+      "get": true,
+      "search": true
+    },
+    "reactions": {
+      "add": true,
+      "catalog": true,
+      "list": true,
+      "remove": true
+    },
+    "recall": true,
+    "resources": {
+      "avatars": true,
+      "read": true
+    },
+    "retranslate": false,
+    "send": {
+      "file": true,
+      "image": true,
+      "lookup": false,
+      "mentionAll": true,
+      "mentions": true,
+      "text": true
+    },
+    "session": {
+      "renew": true
+    }
+  },
+  "platform": {
+    "actions": {
+      "edit": {
+        "own": true,
+        "perMessage": true
+      },
+      "react": true,
+      "recall": {
+        "own": true
+      },
+      "reply": false,
+      "thread": true
+    },
+    "avatarIdentity": {
+      "keyPattern": "^(?i:https)://(?:[^/?#]*\\.(?i:slack-edge\\.com)(?::[0-9]*)?/|(?i:secure\\.gravatar\\.com)(?::[0-9]*)?/(?:[^/?#]*/)*)([^?#]*?)(?:[_-][0-9]+)?(?:\\.[^./?#]*)?(?:[?#]|$)",
+      "variantPattern": "^(?i:https)://(?:[^/?#]*\\.(?i:slack-edge\\.com)(?::[0-9]*)?/[^?#]*?[_-]|(?i:secure\\.gravatar\\.com)(?::[0-9]*)?/[^#]*?[?&]s=)([0-9]+)(?:\\.[^./?#]*)?(?:[?#&]|$)"
+    },
+    "avatarShape": "rounded",
+    "chatLink": "https://slack.com/app_redirect?channel={conversation}",
+    "conversationNouns": {
+      "channel": "频道",
+      "direct": "会话",
+      "group": "会话",
+      "unknown": "会话"
+    },
+    "deletedMessagesVanish": true,
+    "discovery": {
+      "coldPages": 15,
+      "fastestSecs": 30,
+      "pages": 5
+    },
+    "downloads": {
+      "perMinute": 80,
+      "perSecond": 5
+    },
+    "emoji": {
+      "namePattern": "^(?:[^\\s:!\"#$%&()*,./;<=>?@\\[\\\\\\]^`{|}~]|[^\\s:!\"#$%&()*,./;<=>?@\\[\\\\\\]^`{|}~][^\\s!\"#$%&()*,./;<=>?@\\[\\\\\\]^`{|}~]*[^\\s:!\"#$%&()*,./;<=>?@\\[\\\\\\]^`{|}~])$",
+      "unlisted": {
+        "placeholderLabel": ""
+      }
+    },
+    "emojiPerAccount": true,
+    "history": "server",
+    "imageNamePrefix": "Slack 图片",
+    "limits": {
+      "attachmentNameMaxBytes": 255,
+      "fileUploadMaxBytes": 31457280,
+      "imageUploadMaxBytes": 31457280
+    },
+    "pageMax": 200,
+    "reactionsInReads": true,
+    "readDefaults": {
+      "active": 5,
+      "discover": 60,
+      "dormant": 300,
+      "people": 600,
+      "profile": 600,
+      "quiet": 60,
+      "stale": 600,
+      "threadDays": 7,
+      "watching": 2
+    },
+    "reads": {
+      "perMinute": 40,
+      "perSecond": 5
+    },
+    "threads": {
+      "activityOnRoot": true,
+      "broadcast": {
+        "attachments": false,
+        "native": true
+      },
+      "readsAfter": true
+    },
+    "userAdjustable": [
+      "readIntervals"
+    ]
+  },
+  "protocolVersion": 1,
+  "provider": {
+    "id": "slack",
+    "name": "Slack",
+    "version": "1.0.0"
+  },
+  "settings": []
+}

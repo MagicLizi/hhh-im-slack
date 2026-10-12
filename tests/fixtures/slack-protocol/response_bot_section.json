@@ -1,0 +1,114 @@
+{
+  "content": [
+    {
+      "card": {
+        "blocks": [
+          {
+            "parts": [
+              {
+                "text": "🖥️ 文字432 文字433 文字434 文字435 文字436",
+                "type": "markdown"
+              }
+            ],
+            "type": "paragraph"
+          }
+        ],
+        "tone": "neutral"
+      },
+      "type": "card"
+    },
+    {
+      "root": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字437 文字438"
+                  }
+                ],
+                "type": "paragraph"
+              },
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字439 文字440"
+                  }
+                ],
+                "type": "paragraph"
+              },
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字441 文字442"
+                  }
+                ],
+                "type": "paragraph"
+              },
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字443 文字444"
+                  }
+                ],
+                "type": "paragraph"
+              },
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字445 文字446"
+                  }
+                ],
+                "type": "paragraph"
+              },
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字447 文字448"
+                  }
+                ],
+                "type": "paragraph"
+              }
+            ],
+            "type": "blockquote"
+          }
+        ],
+        "type": "root"
+      },
+      "type": "rich"
+    },
+    {
+      "card": {
+        "blocks": [
+          {
+            "parts": [
+              {
+                "text": "[链接](<https://example.com/p/75>)文字449",
+                "type": "markdown"
+              }
+            ],
+            "type": "paragraph"
+          }
+        ],
+        "tone": "neutral"
+      },
+      "type": "card"
+    }
+  ],
+  "conversationId": "C000000099",
+  "createdAtMs": 1759000012000,
+  "id": "1759000012.000012",
+  "reactions": [],
+  "sender": {
+    "id": "B000000002",
+    "idType": "bot_id",
+    "kind": "bot"
+  }
+}

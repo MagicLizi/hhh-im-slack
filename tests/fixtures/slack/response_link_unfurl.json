@@ -1,0 +1,55 @@
+{
+  "ok": true,
+  "messages": [
+    {
+      "user": "U000000001",
+      "type": "message",
+      "ts": "1759000006.000006",
+      "client_msg_id": "00000000-0000-4000-8000-000000000231",
+      "text": "<https://example.com/p/32>\n\n文字232\n文字233",
+      "attachments": [
+        {
+          "service_name": "文字234 文字235 文字236",
+          "title": "文字237 文字238 文字239 文字240",
+          "title_link": "https://example.com/p/33",
+          "text": "文字241",
+          "fallback": "文字242 文字243 文字244: 文字245 文字246 文字247 文字248",
+          "image_url": "https://example.com/p/34",
+          "from_url": "https://example.com/p/35",
+          "image_width": 476,
+          "image_height": 250,
+          "image_bytes": 51666,
+          "service_icon": "https://example.com/p/36",
+          "id": 1,
+          "original_url": "https://example.com/p/37",
+          "media_type": "external_link"
+        }
+      ],
+      "blocks": [
+        {
+          "type": "rich_text",
+          "block_id": "blk5",
+          "elements": [
+            {
+              "type": "rich_text_section",
+              "elements": [
+                {
+                  "type": "link",
+                  "url": "https://example.com/p/38"
+                },
+                {
+                  "type": "text",
+                  "text": "\n\n文字249\n文字250"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "has_more": false,
+  "response_metadata": {
+    "next_cursor": ""
+  }
+}

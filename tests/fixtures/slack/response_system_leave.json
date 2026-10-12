@@ -1,0 +1,16 @@
+{
+  "ok": true,
+  "messages": [
+    {
+      "subtype": "channel_leave",
+      "user": "U000000082",
+      "text": "<@U000000082> 文字645",
+      "type": "message",
+      "ts": "1759000021.000021"
+    }
+  ],
+  "has_more": false,
+  "response_metadata": {
+    "next_cursor": ""
+  }
+}

@@ -1,0 +1,235 @@
+{
+  "content": [
+    {
+      "root": {
+        "children": [
+          {
+            "children": [
+              {
+                "emojiType": "mega",
+                "type": "emoji"
+              },
+              {
+                "type": "text",
+                "value": " "
+              },
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字152 文字153"
+                  }
+                ],
+                "type": "strong"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "type": "text",
+                "value": "文字154 文字155 "
+              },
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字156 文字157 文字158 文字159"
+                  }
+                ],
+                "type": "strong"
+              },
+              {
+                "type": "text",
+                "value": "文字160~"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "type": "text",
+                "value": "文字161 "
+              },
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字162"
+                  }
+                ],
+                "type": "strong"
+              },
+              {
+                "type": "text",
+                "value": "文字163"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "type": "text",
+                "value": "文字164"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "type": "text",
+                            "value": "文字165"
+                          }
+                        ],
+                        "type": "strong"
+                      },
+                      {
+                        "type": "text",
+                        "value": "文字166 文字167"
+                      },
+                      {
+                        "children": [
+                          {
+                            "type": "text",
+                            "value": "文字168"
+                          }
+                        ],
+                        "type": "link",
+                        "url": "https://example.com/p/15"
+                      },
+                      {
+                        "type": "text",
+                        "value": "文字169 文字170"
+                      }
+                    ],
+                    "type": "paragraph"
+                  }
+                ],
+                "type": "listItem"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "type": "text",
+                            "value": "文字171"
+                          }
+                        ],
+                        "type": "strong"
+                      },
+                      {
+                        "type": "text",
+                        "value": "文字172"
+                      },
+                      {
+                        "children": [
+                          {
+                            "type": "text",
+                            "value": "文字173 文字174"
+                          }
+                        ],
+                        "type": "link",
+                        "url": "https://example.com/p/16"
+                      },
+                      {
+                        "type": "text",
+                        "value": "文字175 文字176 文字177"
+                      }
+                    ],
+                    "type": "paragraph"
+                  }
+                ],
+                "type": "listItem"
+              }
+            ],
+            "ordered": false,
+            "type": "list"
+          },
+          {
+            "children": [
+              {
+                "type": "text",
+                "value": "文字178 "
+              },
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字179"
+                  }
+                ],
+                "type": "strong"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "type": "text",
+                "value": "文字180"
+              },
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字181"
+                  }
+                ],
+                "type": "strong"
+              },
+              {
+                "type": "text",
+                "value": "文字182~"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "type": "text",
+                        "value": "文字183 文字184 文字185 文字186~"
+                      }
+                    ],
+                    "type": "strong"
+                  }
+                ],
+                "type": "paragraph"
+              }
+            ],
+            "type": "blockquote"
+          }
+        ],
+        "type": "root"
+      },
+      "type": "rich"
+    }
+  ],
+  "conversationId": "C000000099",
+  "createdAtMs": 1759000003000,
+  "id": "1759000003.000003",
+  "reactions": [],
+  "sender": {
+    "id": "U000000007",
+    "idType": "user_id",
+    "kind": "user"
+  }
+}

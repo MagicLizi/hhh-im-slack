@@ -1,0 +1,35 @@
+{
+  "content": [
+    {
+      "text": "文字228 文字229",
+      "type": "text"
+    },
+    {
+      "name": "文字222 文字223 文字224",
+      "resource": {
+        "key": "F000000001",
+        "kind": "image",
+        "mime": "image/png"
+      },
+      "type": "resource"
+    }
+  ],
+  "conversationId": "C000000099",
+  "createdAtMs": 1759000004000,
+  "id": "1759000004.000004",
+  "reactions": [],
+  "sender": {
+    "id": "U000000001",
+    "idType": "user_id",
+    "kind": "user"
+  },
+  "thread": {
+    "activity": {
+      "latestReplyAtMs": 1759000005000,
+      "latestReplyId": "1759000005.000005",
+      "replyCount": 2
+    },
+    "id": "1759000004.000004",
+    "inThread": false
+  }
+}

@@ -1,35 +1,45 @@
 ---
 name: develop-plugin
-description: 从这个模板起一个新的 HHH IM 插件，或给插件加功能：逐个实现协议方法、本地自检、在 HHH 里试。用户说“做一个 xx 的插件”“接上 xx 平台”“加个发图片”时用。
+description: 改 Slack 插件：修 bug、加或改协议方法、跟上 HHH 协议或宿主翻译的变化、补取样。用户说“修一下 xx”“支持 xx 消息”“协议加了 xx 字段”“HHH 那边翻译改了”时用。
 ---
 
-# 开发 HHH IM 插件
+# 改 Slack 插件
 
-先读 `AGENTS.md`（规矩）与协议 `docs/protocol-v1.md`（在 hhh-im-sdk 仓库）。协议服务、日志、资源分段、上传与请求计数用协议包的
-插件运行时（`hhh_im_protocol::runtime`，见 `AGENTS.md`），插件只写平台的事。
+先读 `AGENTS.md`（规矩与仓库结构）和协议 `docs/protocol-v1.md`（在 hhh-im-sdk 仓库里）。第一原则是体验和内置 Slack 一样。
+协议服务、日志、资源分段、上传与请求计数用协议包的插件运行时，这里只写 Slack 的事。
 
-## 起一个新 IM
+## 找地方
 
-1. 改清单 `hhh-im-provider.json`：`id`（发布后不能改，想清楚）、`name`、`version: 0.1.0`、`logo`、`publisher`、`source`（你的仓库）。
-2. 改 `Cargo.toml` 的包名与 `src/main.rs` 里 `initialize` 的 `provider`，与清单一致；`scripts/pack.*` 里的程序名一起改。
-3. 换掉 `src/main.rs` 里 `Plugin::request` 的示例逻辑（运行时的接法不动）：
-   - `initialize`：如实写 `platform`（`history`：平台能按时间读历史写 `server`，只能收推送写 `none`）与 `capabilities`。
-   - `session/open`：有凭据就连平台、核验账号、回 `online`；没有或失效回 `needsLogin`，HHH 随后调 `login/start`。
-   - 登录：`login/start` 先回 `{flowId}`（`Host::respond`），再用 `login/step` 推二维码 / 打开链接 / 表单；成功先 `credential/save`
-     （`Host::request`）等 HHH 回复，再发 `login/finished`。
-   - 收消息：平台推来的翻成 `Event` 用 `events/push`（`Host::request`）推给 HHH；`history = none` 的每批带 `syncState`，HHH 确认了才算交接。
-   - 读资源、收上传：用运行时的 `Segments`、`Uploads`；向平台发的每个读取请求调一下 `metering::request()`。
-   - 发消息：`messages/send` 翻成平台调用，回 `accepted`（带平台记下的消息）或 `unknown`。
-4. 每加一个方法：对照协议写参数与结果，错误用协议的错误分类（`RpcError::from_kind`），给用户看的原因写人话。
+- Slack 接口、Slack 格式怎么翻成协议的统一格式：`src/slack/`（`translate.rs` 是入口，正文在 `rich.rs`、`mrkdwn.rs`，卡片在 `card.rs`）。
+- 各协议方法在 Slack 上怎么做：`src/slack/methods.rs`。
+- 协议方法：`src/server/mod.rs` 按方法名分派。握手声明在 `declare.rs`，会话、续期与交接在 `session.rs`，登录在 `login.rs` 和 `relay.rs`，
+  参数交给 Slack 适配器在 `methods.rs`。
+
+## 改一处
+
+1. 先写测试再改代码：
+   - Slack 那一侧：用 `tests/slack_http.rs`、`tests/slack_unified.rs`、`tests/slack_people.rs` 里的假 Slack（都经协议调）。
+   - 协议那一侧：用 `tests/server.rs` 里的进程内宿主（`tests/common/mod.rs`），宿主和插件按协议说话。
+   - 翻译：用 `src/slack/goldens.rs`，取样 → 线上消息，样例锁住。
+2. 新取样放进 `tests/fixtures/slack/`，人名、编号、内容一律换成编的。
+3. 错误用协议的错误分类（`src/error.rs`、`src/slack/errors.rs`），给用户看的原因写人话，和内置时的说法一样。
+4. 协议表达不了时，到 hhh-im-sdk 提 issue，不在插件里绕路。
+
+## HHH 那边变了
+
+- **协议加了字段**：重新构建，按编译错误一处处补上；能对齐内置时的就照内置写，再在 `declare.rs` 或 `goldens.rs` 补测试。
+- **宿主翻译改了**：重写样例后拷进 HHH 的 `hhh-im/tests/fixtures/slack-protocol/`，跑 HHH 的 `slack_parity_tests`，让宿主翻回来与内置 Slack 重新一字不差。
 
 ## 每次改完
 
-1. `cargo build --release`。
-2. `scripts/pack`（Windows：`powershell -File scripts/pack.ps1`），再 `hhh-im-check dist/stage/hhh-im-provider.json`，全部通过。
-3. HHH：设置 → IM → 添加 IM → 文件夹，选 `dist/stage`；已经装过就在卡片「管理 → 从文件更新」选它。登录、收、发都试一遍。
+1. `cargo test`、`cargo fmt --check`、`cargo clippy --all-targets` 全部通过。
+2. 样例要变时，用 `HHH_UPDATE_GOLDENS=1 cargo test` 重写 `tests/fixtures/slack-protocol/`，逐个看差异，在交付说明里列出要拷进 HHH 的文件。
+3. 打包并自检：`powershell -File scripts/pack.ps1`，再跑 `hhh-im-check dist/stage/hhh-im-provider.json`。
+4. 在 HHH 里试：设置 → IM → 添加 IM → 文件夹，选 `dist/stage`；已经装过就在卡片里点「管理 → 从文件更新」。登录、读、发都走一遍。
 
 ## 不要
 
-- 不在插件里存聊天记录、凭据、配置（交给 HHH）。
-- 不往标准输出打协议以外的东西（日志用 `log/write`）。
-- 协议没有的能力不伪造；需要就去 hhh-im-sdk 提 issue。
+- 不在插件里存聊天记录、凭据或配置（都交给 HHH）。
+- 不往标准输出写协议以外的东西（日志走 `log/write`）。
+- 不改清单的 `id`（`slack`）。
+- 不把真实的人名、编号、工作区内容写进夹具、测试或注释。
