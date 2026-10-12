@@ -1,0 +1,12 @@
+{
+  "manifestVersion": 1,
+  "id": "demo-im",
+  "name": "示例 IM",
+  "version": "0.3.0",
+  "command": "demo-im",
+  "os": ["windows", "macos", "linux"],
+  "logo": "logo.svg",
+  "publisher": "MagicLizi",
+  "homepage": "https://github.com/MagicLizi/hhh-im-plugin-template",
+  "source": { "type": "github", "repo": "MagicLizi/hhh-im-plugin-template" }
+}

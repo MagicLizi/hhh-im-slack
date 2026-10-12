@@ -1,0 +1,21 @@
+[package]
+name = "demo-im"
+version = "0.3.0"
+edition = "2024"
+publish = false
+license = "MIT"
+description = "示例 IM：HHH IM 插件的最小可用骨架"
+
+[dependencies]
+# 协议包：线上类型与插件运行时（协议服务、日志、资源分段、上传、请求计数；按标签取一个固定版本）。
+hhh-im-protocol = { git = "https://github.com/MagicLizi/hhh-im-sdk", tag = "v0.4.0", features = ["runtime"] }
+serde_json = "1"
+# tokio：插件运行时在它上面跑（读写标准输入输出、并发处理宿主的请求）。
+tokio = { version = "1", default-features = false, features = ["rt", "macros", "io-std"] }
+# tracing：日志门面，运行时把日志转成 log/write 交给宿主。
+tracing = "0.1"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
