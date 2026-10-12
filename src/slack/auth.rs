@@ -8,9 +8,14 @@
 //! - 用授权码换令牌时，本人令牌在 `authed_user` 下（`access_token`、`refresh_token`、`expires_in`、`scope`）；
 //! - 续期时令牌在顶层，`token_type` 为 `user`；
 //! - 令牌轮换打开后，访问令牌 12 小时（43200 秒）过期，每次续期都换一个新的刷新令牌。
+//!
+//! 续期不带 Client Secret 只对“桌面回调”（`localhost`）拿到的授权有效；经 https 回调（公网授权中继）拿到的，
+//! Slack 续期一律回 `bad_client_secret`，而且这样拒绝不会用掉刷新令牌（HHH 契约 friend/im-auth-relay v7 取样）。
+//! 这时改经授权中继续（[`SlackAuth::refresh_via_relay`]）：中继带上应用的 Client Secret 向 Slack 续期，只转回令牌。
 
 use super::SlackConfig;
-use super::api::{Api, QUERY_TIMEOUT, split_scopes};
+use super::api::{Api, QUERY_TIMEOUT, parse_base, read_limited, split_scopes};
+use super::errors;
 use crate::grant::{now_secs, random_id};
 use crate::{AuthGrant, Error, ErrorKind, Result};
 use base64::Engine as _;
@@ -21,6 +26,10 @@ use sha2::{Digest, Sha256};
 
 /// 一次授权从打开授权页到回调的最长等待；与 Slack 授权码的有效期一致（10 分钟）。
 const LOGIN_TTL_SECS: u64 = 600;
+/// 授权中继续期回执的读取上限；正常不到 2 KB。
+const RELAY_RESPONSE_MAX_BYTES: usize = 64 * 1024;
+/// 授权中继上的 Slack 续期入口。
+const RELAY_REFRESH_PATH: &str = "/v1/slack/refresh";
 /// 一次性暗号的随机字节数：32 字节编码后是 43 个字符，落在 RFC 7636 要求的 43–128 之间。
 const VERIFIER_BYTES: usize = 32;
 /// Client ID 的长度上限；Slack 的 Client ID 形如 `123456789.123456789`。
@@ -249,6 +258,69 @@ impl SlackAuth {
             .unwrap_or(value);
         let grant = grant_of(body)?;
         tracing::info!("Slack 授权已续期");
+        Ok(grant)
+    }
+
+    /// 经授权中继续期（`POST <中继>/v1/slack/refresh {refreshToken}`）：本机续期被 Slack 以缺 Client Secret 拒绝时用。
+    /// 中继带上应用的 Secret 向 Slack 续期，成功时回 `{token:{access_token, refresh_token, expires_in, …}}`。中继说 Slack
+    /// 拒绝时按 Slack 的错误名翻译；中继自己的应用凭据不对、没配、连不上 Slack 或中继，都算暂时不能续（刷新令牌没用掉）。
+    /// 令牌只在请求与回执里，不进日志。
+    pub async fn refresh_via_relay(&self, relay: &str, grant: &AuthGrant) -> Result<AuthGrant> {
+        let refresh = grant.refresh_token().ok_or_else(|| {
+            Error::new(
+                ErrorKind::AuthExpired,
+                "Slack 授权没有刷新令牌，需要重新登录。",
+            )
+        })?;
+        let url = parse_base(relay)?
+            .join(RELAY_REFRESH_PATH)
+            .map_err(|_| Error::new(ErrorKind::InvalidRequest, "授权中继地址格式不正确。"))?;
+        let response = self
+            .api
+            .http()
+            .post(url)
+            .json(&serde_json::json!({ "refreshToken": refresh }))
+            .timeout(QUERY_TIMEOUT)
+            .send()
+            .await
+            .map_err(|error| Error::network(error, "暂时连不上授权中继，稍后自动再试。"))?;
+        let status = response.status().as_u16();
+        let bytes = read_limited(response, RELAY_RESPONSE_MAX_BYTES).await?;
+        let value: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+        let unavailable = |why: &str| {
+            tracing::warn!(status, why, "授权中继暂时不能续期 Slack 授权");
+            Error::new(
+                ErrorKind::Disconnected,
+                "授权中继暂时不能续期 Slack 登录，稍后自动再试。",
+            )
+        };
+        let token = match status {
+            200 => value
+                .get("token")
+                .filter(|token| token.is_object())
+                .cloned()
+                .ok_or_else(|| unavailable("回执里没有令牌"))?,
+            400 if value.pointer("/error/code").and_then(Value::as_str)
+                == Some("slack_refresh_rejected") =>
+            {
+                let name = value
+                    .pointer("/error/slackError")
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown_error");
+                return Err(match name {
+                    // 中继上的应用凭据不对：不是这份授权的问题，等中继修好。
+                    "bad_client_secret" | "invalid_client_id" => {
+                        unavailable("中继上的 Slack 应用凭据不对")
+                    }
+                    _ => errors::from_slack(name, 200, None),
+                });
+            }
+            429 => return Err(errors::from_slack("ratelimited", status, None)),
+            409 => return Err(unavailable("中继没有配置 Slack 应用")),
+            _ => return Err(unavailable("中继回了意外的状态")),
+        };
+        let grant = grant_of(&token)?;
+        tracing::info!(via_relay = true, "Slack 授权已续期");
         Ok(grant)
     }
 }

@@ -397,3 +397,101 @@ async fn pkce_exchange_and_refresh_never_send_a_client_secret() {
         assert_eq!(fields["client_id"], "123.456");
     }
 }
+
+/// 一份经 https 回调登录拿到的授权（本机续期会被要 Client Secret）。
+fn relayed_grant() -> AuthGrant {
+    AuthGrant::from_parts(
+        "xoxe.xoxp-1-old".into(),
+        Some("xoxe-1-r1".into()),
+        Some(1),
+        None,
+    )
+    .unwrap()
+}
+
+// 经授权中继续期（HHH 契约 friend/im-auth-relay v7）：中继转回令牌就用；Slack 拒绝按 Slack 的错误名要求重新登录；
+// 中继上的应用凭据不对、没配、连不上 Slack、回执不对都不算这份授权失效；限流照限流。中继只收到刷新令牌一项。
+#[tokio::test]
+async fn relay_refresh_answers_keep_reauthorization_apart_from_temporary_trouble() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/slack/refresh"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"token": {
+            "access_token": "xoxe.xoxp-1-new", "refresh_token": "xoxe-1-r2", "expires_in": 43200,
+            "token_type": "user", "scope": "chat:write"
+        }})))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let auth = SlackAuth::new(config(&server), "123.456").unwrap();
+    let renewed = auth
+        .refresh_via_relay(&server.uri(), &relayed_grant())
+        .await
+        .unwrap();
+    assert_eq!(renewed.access_token(), "xoxe.xoxp-1-new");
+    assert_eq!(renewed.refresh_token(), Some("xoxe-1-r2"));
+    let sent: Value =
+        serde_json::from_slice(&server.received_requests().await.unwrap()[0].body).unwrap();
+    assert_eq!(sent, json!({"refreshToken": "xoxe-1-r1"}));
+
+    let cases = [
+        (
+            ResponseTemplate::new(400).set_body_json(json!({"error": {
+                "code": "slack_refresh_rejected", "slackError": "invalid_refresh_token", "message": "拒绝"}})),
+            ErrorKind::AuthExpired,
+            Some(hhh_im_slack::ReauthReason::Expired),
+        ),
+        (
+            ResponseTemplate::new(400).set_body_json(json!({"error": {
+                "code": "slack_refresh_rejected", "slackError": "bad_client_secret", "message": "拒绝"}})),
+            ErrorKind::Disconnected,
+            None,
+        ),
+        (
+            ResponseTemplate::new(409).set_body_json(json!({"error": {
+                "code": "slack_refresh_unavailable", "message": "这个中继没有配置 Slack 应用。"}})),
+            ErrorKind::Disconnected,
+            None,
+        ),
+        (
+            ResponseTemplate::new(502).set_body_json(json!({"error": {
+                "code": "slack_unreachable", "message": "连不上"}})),
+            ErrorKind::Disconnected,
+            None,
+        ),
+        (
+            ResponseTemplate::new(200).set_body_json(json!({"unexpected": true})),
+            ErrorKind::Disconnected,
+            None,
+        ),
+        (
+            ResponseTemplate::new(429).set_body_json(json!({"error": {
+                "code": "refresh_rate_limited", "message": "太频繁"}})),
+            ErrorKind::RateLimited,
+            None,
+        ),
+    ];
+    for (answer, kind, reauth) in cases {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/slack/refresh"))
+            .respond_with(answer)
+            .mount(&server)
+            .await;
+        let auth = SlackAuth::new(config(&server), "123.456").unwrap();
+        let error = auth
+            .refresh_via_relay(&server.uri(), &relayed_grant())
+            .await
+            .unwrap_err();
+        assert_eq!((error.kind, error.reauth), (kind, reauth), "{error:?}");
+    }
+    let auth = SlackAuth::new(config(&server), "123.456").unwrap();
+    assert_eq!(
+        auth.refresh_via_relay("http://127.0.0.1:9", &relayed_grant())
+            .await
+            .unwrap_err()
+            .kind,
+        ErrorKind::Disconnected,
+        "中继连不上：暂时故障"
+    );
+}
