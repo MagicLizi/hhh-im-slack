@@ -398,12 +398,18 @@ impl Server {
         SlackClient::connect(self.options.config.clone(), grant, self.caches.clone()).await
     }
 
-    /// 用发出这份授权的应用续期：旧版本自填的 Client ID，或 HHH 的应用。
+    /// 用发出这份授权的应用续期：旧版本自填的 Client ID，或 HHH 的应用。Slack 以缺 Client Secret 拒绝时（经 https 回调
+    /// 登录拿到的授权，HHH 契约 friend/im-auth-relay v7）改经登录用的那个授权中继续期；这样拒绝不耗刷新令牌。
     async fn refresh(&self, credential: &Credential, grant: &AuthGrant) -> Result<AuthGrant> {
         let client_id = credential.client_id.as_deref().unwrap_or(BUILTIN_CLIENT_ID);
-        SlackAuth::new(self.options.config.clone(), client_id)?
-            .refresh(grant)
-            .await
+        let auth = SlackAuth::new(self.options.config.clone(), client_id)?;
+        match auth.refresh(grant).await {
+            Err(error) if error.platform_code.as_deref() == Some("bad_client_secret") => {
+                tracing::info!("Slack 要 Client Secret 才能续这份授权，改经授权中继续期");
+                auth.refresh_via_relay(&self.options.relay_url, grant).await
+            }
+            other => other,
+        }
     }
 
     /// 把凭据交给宿主存（`credential/save`，带下次续期的时间），等宿主回复。

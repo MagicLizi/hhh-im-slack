@@ -771,3 +771,67 @@ async fn people_get_reads_bots_and_tells_missing_from_not_read() {
         .await;
     assert_eq!(kind_of(&error), hhh_im_protocol::ErrorKind::Disconnected);
 }
+
+/// 经 https 回调登录拿到的授权到期（HHH 契约 friend/im-auth-relay v7 S1）：本机续期被 Slack 以 `bad_client_secret` 拒绝，
+/// 同一个刷新令牌交给登录用的那个中继续上；新凭据先存进宿主、宿主回了成功才回在线。本机那次不带 Secret。
+#[tokio::test]
+async fn an_expired_grant_that_slack_will_not_renew_locally_is_renewed_through_the_relay() {
+    let slack = MockServer::start().await;
+    mount_auth_for(
+        &slack,
+        "xoxe.xoxp-relayed",
+        &hhh_im_slack::USER_SCOPES.join(","),
+    )
+    .await;
+    Mock::given(method("POST"))
+        .and(path("/api/oauth.v2.access"))
+        .and(body_string_contains("grant_type=refresh_token"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"ok": false, "error": "bad_client_secret"})),
+        )
+        .mount(&slack)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/slack/refresh"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"token": {
+            "access_token": "xoxe.xoxp-relayed", "refresh_token": "xoxe-relayed-2", "expires_in": 43200,
+            "token_type": "user", "scope": hhh_im_slack::USER_SCOPES.join(",")
+        }})))
+        .expect(1)
+        .mount(&slack)
+        .await;
+    let host = Host::start(options(&slack)).await;
+    let expired = credential(
+        "xoxe.xoxp-old",
+        Some("xoxe-relayed-1"),
+        Some(now_secs() - 10),
+    );
+    let call = host.call(
+        "session/open",
+        json!({ "credential": expired, "settings": {} }),
+    );
+    let (open, saved) = tokio::join!(call, host.expect_save(true));
+    let saved: Value = serde_json::from_str(saved["credential"].as_str().unwrap()).unwrap();
+    assert_eq!(saved["accessToken"], "xoxe.xoxp-relayed");
+    assert_eq!(saved["refreshToken"], "xoxe-relayed-2");
+    assert_eq!(open.unwrap()["state"], "online");
+    let local = requests_to(&slack, "oauth.v2.access").await;
+    assert_eq!(local.len(), 1, "本机只试一次");
+    let local = form(&local[0]);
+    assert_eq!(local["refresh_token"], "xoxe-relayed-1");
+    assert!(!local.contains_key("client_secret"), "本机续期不带 Secret");
+    let relayed: Vec<_> = slack
+        .received_requests()
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|request| request.url.path() == "/v1/slack/refresh")
+        .collect();
+    let body: Value = serde_json::from_slice(&relayed[0].body).unwrap();
+    assert_eq!(
+        body,
+        json!({"refreshToken": "xoxe-relayed-1"}),
+        "中继收到同一个刷新令牌"
+    );
+}
