@@ -1,19 +1,58 @@
 [package]
-name = "demo-im"
-version = "0.3.0"
+name = "hhh-im-slack"
+version = "1.0.0"
 edition = "2024"
 publish = false
 license = "MIT"
-description = "示例 IM：HHH IM 插件的最小可用骨架"
+description = "Slack：HHH 的 Slack IM 插件（从 HHH 内置的 Slack 适配器搬出来）"
+
+# 库：Slack 适配器本体（和 Slack 说话、把 Slack 的格式翻成协议的统一格式）与协议服务；集成测试与插件程序都用它。
+[lib]
+name = "hhh_im_slack"
+path = "src/lib.rs"
+
+# 插件程序：HHH 拉起的子进程，按 HHH-IM-Protocol v1 走标准输入输出。
+[[bin]]
+name = "hhh-im-slack"
+path = "src/main.rs"
 
 [dependencies]
-# 协议包：线上类型与插件运行时（协议服务、日志、资源分段、上传、请求计数；按标签取一个固定版本）。
+# 协议包：线上类型、格式正文与卡片的类型、插件运行时（协议服务、日志、资源分段、上传、请求计数；按标签取一个固定版本）。
 hhh-im-protocol = { git = "https://github.com/MagicLizi/hhh-im-sdk", tag = "v0.4.0", features = ["runtime"] }
+# serde：序列化框架；derive = 在类型上一行 #[derive(Serialize, Deserialize)] 自动生成编解码。
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# tokio：插件运行时在它上面跑（读写标准输入输出、并发处理宿主的请求）。
-tokio = { version = "1", default-features = false, features = ["rt", "macros", "io-std"] }
-# tracing：日志门面，运行时把日志转成 log/write 交给宿主。
+# reqwest：HTTP 客户端。不带系统 TLS，统一用 rustls；TLS 配置由 net 模块组好整份交给它。
+# json = 请求体直接塞 JSON；gzip = 声明并自动解压 gzip 响应；stream = 按块读响应体（下载资源）。
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots-no-provider", "json", "gzip", "stream"] }
+# rustls：TLS 协议实现，加密后端 aws-lc-rs；prefer-post-quantum 让握手优先抗量子密钥交换（同 HHH 的 hhh-net，见 net 模块）。
+rustls = { version = "0.23.27", default-features = false, features = ["aws_lc_rs", "prefer-post-quantum", "std", "tls12", "logging"] }
+# webpki-roots：内置公共根证书，不读系统证书库，各平台行为一致。
+webpki-roots = "1"
+# tracing：日志门面。库代码只发日志事件，插件运行时把它转成协议的 log/write 交给宿主。
 tracing = "0.1"
+# getrandom：操作系统级随机数（登录的一次性 state 与 PKCE 暗号）。
+getrandom = "0.3"
+# tokio：异步运行时。协议服务读标准输入、写标准输出、并发处理宿主的请求；登录在后台等授权结果。
+tokio = { version = "1", default-features = false, features = ["rt", "rt-multi-thread", "macros", "sync", "time", "io-std"] }
+# base64：PKCE 暗号与摘要按 base64url 写。
+base64 = "0.22"
+# sha2：PKCE 的 S256 摘要。
+sha2 = "0.11"
+
+[dev-dependencies]
+# 异步测试；test-util 是可暂停的虚拟时钟，net 让测试能起本机服务，io-util 给进程内的管道。
+tokio = { version = "1", default-features = false, features = ["macros", "rt-multi-thread", "time", "test-util", "net", "io-util"] }
+# wiremock：测试用的本机假 Slack 与假授权中继，验证请求形状与错误分级。
+wiremock = "0.6"
+# 测试里用宿主那一侧的连接层（transport）当宿主，跟插件按协议说话。
+hhh-im-protocol = { git = "https://github.com/MagicLizi/hhh-im-sdk", tag = "v0.4.0", features = ["runtime", "transport"] }
+# regex-lite：宿主认头像身份、表情编号用的正则库，测试里拿它核对声明的写法与内置的认法一致。
+regex-lite = "0.1"
+
+[lints.rust]
+# 从第一天起保持零警告（与 HHH 相同）。
+warnings = "deny"
 
 [profile.release]
 strip = true

@@ -1,0 +1,63 @@
+{
+  "content": [
+    {
+      "root": {
+        "children": [
+          {
+            "children": [
+              {
+                "type": "text",
+                "value": "文字639 文字640 "
+              },
+              {
+                "type": "inlineCode",
+                "value": "文字641"
+              },
+              {
+                "type": "text",
+                "value": " 文字642"
+              },
+              {
+                "emojiType": "pray",
+                "type": "emoji"
+              },
+              {
+                "type": "text",
+                "value": " (文字643 文字644)"
+              }
+            ],
+            "type": "paragraph"
+          }
+        ],
+        "type": "root"
+      },
+      "type": "rich"
+    }
+  ],
+  "conversationId": "C000000099",
+  "createdAtMs": 1759000019000,
+  "id": "1759000019.000019",
+  "reactions": [
+    {
+      "conversationId": "C000000099",
+      "emojiType": "heavy_plus_sign",
+      "id": "U000000084:heavy_plus_sign",
+      "messageId": "1759000019.000019",
+      "operator": {
+        "id": "U000000084",
+        "idType": "user_id",
+        "kind": "user"
+      }
+    }
+  ],
+  "sender": {
+    "id": "U000000083",
+    "idType": "user_id",
+    "kind": "user"
+  },
+  "thread": {
+    "id": "1759000020.000020",
+    "inThread": true,
+    "rootId": "1759000020.000020"
+  }
+}

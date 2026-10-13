@@ -1,0 +1,234 @@
+//! `initialize`（protocol-v1 §4.1、§5）：插件信息、平台说明与能力，照 HHH 内置 Slack 的平台表（`im_client.rs` 的
+//! `PLATFORM`）一项一项写出来。`tests/fixtures/initialize.json` 锁住结果，HHH 那边拿它与内置的平台表逐项对照。
+//!
+//! 不声明登录方式：内置 Slack 用 HHH 的 Slack 应用，用户不用填任何东西，点“登录”就打开授权页（宿主见没有登录方式时
+//! 直接开始登录）。
+
+use hhh_im_protocol::method as pm;
+use hhh_im_protocol::platform::{
+    ActionRules, Adjustable, AvatarIdentity, AvatarShape, Broadcast, Capabilities,
+    ConversationCaps, ConversationNouns, DiscoveryDesc, EditRule, EmojiRules, HistoryMode, Limits,
+    MessageCaps, OwnWithin, PeopleCaps, PlatformDesc, RateBudget, ReactionCaps, ReadIntervalsSecs,
+    ResourceCaps, SendCaps, SessionCaps, Threads, UnlistedEmoji,
+};
+use hhh_im_protocol::rpc::RpcError;
+use serde_json::Value;
+
+use crate::slack::{HISTORY_PAGE_MAX, UPLOAD_MAX_BYTES, methods::PEOPLE_BATCH_MAX};
+use crate::{AVATAR_KEY_PATTERN, AVATAR_VARIANT_PATTERN, EMOJI_NAME_PATTERN, ErrorKind};
+
+/// 插件编号（同清单 `id`）。
+pub(crate) const PROVIDER_ID: &str = "slack";
+/// 平台名字。
+pub(crate) const NAME: &str = "Slack";
+/// 附件文件名上限（Slack 按 255 字节截断）。
+const ATTACHMENT_NAME_MAX_BYTES: u32 = 255;
+
+/// 平台说明。
+pub(crate) fn platform() -> PlatformDesc {
+    PlatformDesc {
+        // Slack 客户端里的头像是圆角方形（契约 client v24）。
+        avatar_shape: AvatarShape::Rounded,
+        avatar_identity: Some(AvatarIdentity {
+            key_pattern: AVATAR_KEY_PATTERN.into(),
+            variant_pattern: Some(AVATAR_VARIANT_PATTERN.into()),
+        }),
+        history: HistoryMode::Server,
+        // 同内置的 `actions`：没有引用回复；撤回的、系统消息什么都不能做（宿主统一规则）；其余能回话题、点表情，本人发的
+        // 还能撤回；只有带编辑原文的（文字与提及）本人消息能编辑，编辑框用这份原文（契约 client v18 §2.4）。
+        actions: ActionRules {
+            reply: false,
+            thread: true,
+            react: true,
+            recall: Some(OwnWithin {
+                own: true,
+                within_secs: None,
+            }),
+            edit: Some(EditRule {
+                own: true,
+                within_secs: None,
+                per_message: true,
+            }),
+        },
+        // 不带工作区也能打开：Slack 用当前登录的工作区找这个会话。
+        chat_link: Some("https://slack.com/app_redirect?channel={conversation}".into()),
+        image_name_prefix: Some("Slack 图片".into()),
+        // 频道叫“频道”，私聊与群私聊叫“会话”（契约 client v18 §2.1）。
+        conversation_nouns: Some(ConversationNouns {
+            group: "会话".into(),
+            direct: "会话".into(),
+            channel: "频道".into(),
+            unknown: "会话".into(),
+        }),
+        // 历史与话题一页最多 200 条（契约 client v11 §3.3）。
+        page_max: Some(u32::from(HISTORY_PAGE_MAX)),
+        // 读历史与话题是 Slack 的第 3 档限速（每个工作区每分钟 50 次以上），合计留出余量（契约 client v11 §3.12）。
+        reads: Some(RateBudget {
+            per_second: 5,
+            per_minute: 40,
+        }),
+        // 每个文件先查一次文件资料（第 4 档，每分钟 100 次以上），再下载。
+        downloads: Some(RateBudget {
+            per_second: 5,
+            per_minute: 80,
+        }),
+        file_segment_bytes: None,
+        limits: Some(Limits {
+            image_upload_max_bytes: UPLOAD_MAX_BYTES as u64,
+            file_upload_max_bytes: UPLOAD_MAX_BYTES as u64,
+            attachment_name_max_bytes: ATTACHMENT_NAME_MAX_BYTES,
+        }),
+        // 同内置：通用的读取频率，会话发现默认 1 分钟（契约 client v29：新版搜索按用户每分钟约 10 次）。
+        read_defaults: Some(ReadIntervalsSecs {
+            watching: 2,
+            active: 5,
+            quiet: 60,
+            dormant: 5 * 60,
+            stale: 10 * 60,
+            profile: 10 * 60,
+            people: 10 * 60,
+            thread_days: 7,
+            discover: Some(60),
+        }),
+        threads: Some(Threads {
+            // 读会话时根消息带 `latest_reply`、`reply_count`，删回复会往回退（契约 client v27 取样）：话题靠线索读。
+            activity_on_root: true,
+            // `conversations.replies` 的 `oldest` 只回根消息与之后的回复（取样）。
+            reads_after: true,
+            // 平台原生：话题回复带 `reply_broadcast=true` 就同时出现在频道里，是同一条消息；文件上传没有这个参数。
+            broadcast: Some(Broadcast {
+                native: true,
+                attachments: false,
+            }),
+        }),
+        deleted_messages_vanish: true,
+        // 历史与话题里的消息都带着 `reactions`（没人点过就没有这个字段），列出的人不全时那条另读（契约 client v27 §6.3）。
+        reactions_in_reads: true,
+        emoji_per_account: true,
+        emoji: Some(EmojiRules {
+            name_pattern: Some(EMOJI_NAME_PATTERN.into()),
+            // 目录里没有的表情（自定义表情被删了）不猜图、不画占位图标，写名字。
+            unlisted: UnlistedEmoji {
+                placeholder_pattern: None,
+                placeholder_label: String::new(),
+                guess: false,
+                guess_pattern: None,
+            },
+            // 正文里的 `:name:` 在翻译时已换成表情节点，界面不再按文字找；Slack 的表情图不是白底。
+            text_pattern: None,
+            white_background: false,
+        }),
+        // 新版搜索 `assistant.search.context`（契约 client v29，2026-10-04 取样）：每页 20 条、发出后 15–30 秒收录；
+        // 限额按用户每分钟约 10 次、翻页也算，最快 30 秒一次。
+        discovery: Some(DiscoveryDesc {
+            fastest_secs: 30,
+            pages: 5,
+            cold_pages: 15,
+        }),
+        // 参数配置里只开放读取频率，与内置一样（契约 provider-protocol v12 缺口 2）。
+        user_adjustable: vec![Adjustable::ReadIntervals],
+        // 编辑过的消息 Slack 每次都带着 `edited`（契约 client v11 §3.6），不用按内容比较。
+        edits_by_content: Vec::new(),
+        retranslate_rules: Vec::new(),
+    }
+}
+
+/// 能力：内置 Slack 做得到的都声明；不推送（今天的 Slack 靠定时读）。
+pub(crate) fn capabilities() -> Capabilities {
+    Capabilities {
+        conversations: ConversationCaps {
+            list: true,
+            search: true,
+            members: true,
+            find_direct: true,
+            recent_activity: true,
+        },
+        messages: MessageCaps {
+            list: true,
+            get: true,
+        },
+        // 机器人按编号读（`bots.info`）；一批取到人名册一次查询的上限，整份成员名单读一遍就认出一大批人。
+        people: PeopleCaps {
+            get: true,
+            search: true,
+            bots: true,
+            batch_max: Some(PEOPLE_BATCH_MAX),
+        },
+        send: Some(SendCaps {
+            text: true,
+            mentions: true,
+            mention_all: true,
+            image: true,
+            file: true,
+            lookup: false,
+        }),
+        recall: true,
+        edit: true,
+        reactions: ReactionCaps {
+            list: true,
+            add: true,
+            remove: true,
+            catalog: true,
+        },
+        resources: ResourceCaps {
+            read: true,
+            avatars: true,
+        },
+        events: Default::default(),
+        retranslate: false,
+        session: SessionCaps { renew: true },
+    }
+}
+
+/// `initialize` 的结果。宿主只说得出别的协议版本时拒绝。
+pub(crate) fn initialize(params: pm::InitializeParams) -> Result<Value, RpcError> {
+    if !params
+        .protocol_versions
+        .contains(&hhh_im_protocol::PROTOCOL_VERSION)
+    {
+        return Err(RpcError::from_kind(
+            ErrorKind::Unsupported,
+            "Slack 插件只支持 HHH-IM-Protocol v1，请更新 HHH。",
+        ));
+    }
+    Ok(result())
+}
+
+/// `initialize` 的结果（不看宿主参数的那部分）。
+pub fn result() -> Value {
+    serde_json::to_value(pm::InitializeResult {
+        protocol_version: hhh_im_protocol::PROTOCOL_VERSION,
+        provider: pm::ProviderInfo {
+            id: PROVIDER_ID.into(),
+            name: NAME.into(),
+            version: env!("CARGO_PKG_VERSION").into(),
+        },
+        platform: platform(),
+        capabilities: capabilities(),
+        settings: Vec::new(),
+        login_methods: Vec::new(),
+        actions: Vec::new(),
+    })
+    .expect("握手结果总能写成 JSON")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_declaration_is_consistent() {
+        capabilities()
+            .check_consistent(HistoryMode::Server)
+            .expect("能力自洽");
+        let value = result();
+        assert_eq!(value["provider"]["id"], "slack");
+        assert_eq!(value["capabilities"]["people"]["bots"], true);
+        assert_eq!(value["capabilities"]["people"]["batchMax"], 2000);
+        assert!(
+            value
+                .get("loginMethods")
+                .is_none_or(|methods| methods.as_array().is_some_and(Vec::is_empty))
+        );
+    }
+}

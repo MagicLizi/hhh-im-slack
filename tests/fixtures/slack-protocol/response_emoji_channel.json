@@ -1,0 +1,277 @@
+{
+  "content": [
+    {
+      "root": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "emojiType": "loudspeaker",
+                    "type": "emoji"
+                  }
+                ],
+                "type": "strong"
+              },
+              {
+                "children": [
+                  {
+                    "type": "inlineCode",
+                    "value": "文字685 文字686"
+                  }
+                ],
+                "type": "strong"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "type": "text",
+                "value": "文字687"
+              },
+              {
+                "children": [
+                  {
+                    "type": "inlineCode",
+                    "value": "文字688(文字689)文字690 文字691"
+                  }
+                ],
+                "type": "strong"
+              },
+              {
+                "type": "text",
+                "value": "文字692 文字693"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "type": "text",
+                "value": "文字694"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "type": "inlineCode",
+                    "value": "文字695"
+                  }
+                ],
+                "type": "strong"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "type": "inlineCode",
+                            "value": "文字696"
+                          }
+                        ],
+                        "type": "strong"
+                      },
+                      {
+                        "children": [
+                          {
+                            "type": "text",
+                            "value": " "
+                          }
+                        ],
+                        "type": "strong"
+                      }
+                    ],
+                    "type": "paragraph"
+                  }
+                ],
+                "type": "listItem"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "type": "inlineCode",
+                            "value": "文字697"
+                          }
+                        ],
+                        "type": "strong"
+                      }
+                    ],
+                    "type": "paragraph"
+                  }
+                ],
+                "type": "listItem"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "type": "inlineCode",
+                            "value": "文字698"
+                          }
+                        ],
+                        "type": "strong"
+                      }
+                    ],
+                    "type": "paragraph"
+                  }
+                ],
+                "type": "listItem"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "type": "inlineCode",
+                            "value": "文字699"
+                          }
+                        ],
+                        "type": "strong"
+                      }
+                    ],
+                    "type": "paragraph"
+                  }
+                ],
+                "type": "listItem"
+              }
+            ],
+            "ordered": true,
+            "type": "list"
+          },
+          {
+            "children": [
+              {
+                "type": "text",
+                "value": "文字700"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "type": "text",
+                        "value": "文字701"
+                      }
+                    ],
+                    "type": "link",
+                    "url": "https://example.com/p/162"
+                  }
+                ],
+                "type": "strong"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字702"
+                  }
+                ],
+                "type": "strong"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "type": "text",
+                        "value": "文字703 文字704"
+                      }
+                    ],
+                    "type": "paragraph"
+                  }
+                ],
+                "type": "listItem"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "children": [
+                          {
+                            "type": "text",
+                            "value": "文字705 文字706"
+                          }
+                        ],
+                        "type": "strong"
+                      },
+                      {
+                        "type": "text",
+                        "value": "文字707"
+                      }
+                    ],
+                    "type": "paragraph"
+                  }
+                ],
+                "type": "listItem"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "type": "text",
+                        "value": "文字708 文字709"
+                      }
+                    ],
+                    "type": "paragraph"
+                  }
+                ],
+                "type": "listItem"
+              }
+            ],
+            "ordered": false,
+            "type": "list"
+          }
+        ],
+        "type": "root"
+      },
+      "type": "rich"
+    }
+  ],
+  "conversationId": "C000000099",
+  "createdAtMs": 1759000022000,
+  "editedAtMs": 1759000023000,
+  "id": "1759000022.000022",
+  "reactions": [],
+  "sender": {
+    "id": "U000000002",
+    "idType": "user_id",
+    "kind": "user"
+  },
+  "updatedAtMs": 1759000023000
+}
