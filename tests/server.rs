@@ -41,7 +41,16 @@ async fn initialize_declares_the_builtin_slack_platform() {
         .capabilities
         .check_consistent(parsed.platform.history)
         .unwrap();
-    assert!(parsed.login_methods.is_empty(), "点登录直接开授权页");
+    // 只有「通过中继登录」一种：中继框预填 HHH 的中继（v14 `defaultValue`），用户可以改；没有本机回调。
+    assert_eq!(parsed.login_methods.len(), 1);
+    let relay = &parsed.login_methods[0];
+    assert_eq!(relay.id, "relay");
+    assert_eq!(relay.kind, hhh_im_protocol::method::LoginKind::Relay);
+    assert_eq!(
+        relay.default_value.as_deref(),
+        Some("https://hhh-im-auth.magiclizi.com")
+    );
+    assert!(relay.callback_path.is_none() && relay.id_label.is_none());
     assert!(parsed.capabilities.people.bots, "机器人按编号读");
     let refused = host
         .err(
@@ -233,9 +242,10 @@ async fn handover_saves_first_and_keeps_the_app_that_issued_the_grant() {
     assert!(host.next_within(Duration::from_millis(200)).await.is_none());
 }
 
-/// 中继登记：不要代换令牌，照请求里的 state 回。
+/// 中继登记：不要代换令牌，照请求里的 state 回；配了自己的 Slack 应用的中继另回它的 Client ID。
 struct Registered {
     base: String,
+    client_id: Option<&'static str>,
 }
 
 impl Respond for Registered {
@@ -243,11 +253,15 @@ impl Respond for Registered {
         let body: Value = serde_json::from_slice(&request.body).unwrap();
         assert_eq!(body["platform"], "slack");
         assert!(body.get("exchange").is_none(), "Slack 不要中继代换令牌");
-        ResponseTemplate::new(201).set_body_json(json!({
+        let mut created = json!({
             "state": body["state"], "claimToken": "claim-secret",
             "callbackUrl": format!("{}/hhh-friend-im/slack/callback", self.base),
             "expiresIn": 300
-        }))
+        });
+        if let Some(client_id) = self.client_id {
+            created["clientId"] = client_id.into();
+        }
+        ResponseTemplate::new(201).set_body_json(created)
     }
 }
 
@@ -275,10 +289,16 @@ impl Respond for Claimed {
 }
 
 async fn mount_relay(slack: &MockServer, result: Value) {
+    mount_relay_as(slack, result, None).await;
+}
+
+/// 假中继：`client_id` 是它配的 Slack 应用（没配就不回）。
+async fn mount_relay_as(slack: &MockServer, result: Value, client_id: Option<&'static str>) {
     Mock::given(method("POST"))
         .and(path("/v1/flows"))
         .respond_with(Registered {
             base: relay_base(slack),
+            client_id,
         })
         .mount(slack)
         .await;
@@ -399,6 +419,7 @@ async fn denied_cancelled_and_unregistered_logins_end_with_a_reason() {
         .and(path("/v1/flows"))
         .respond_with(Registered {
             base: relay_base(&slack),
+            client_id: None,
         })
         .mount(&slack)
         .await;
@@ -437,6 +458,150 @@ async fn denied_cancelled_and_unregistered_logins_end_with_a_reason() {
     assert!(host.next_within(Duration::from_millis(200)).await.is_none());
     let other = host.err("login/start", json!({ "method": "own" })).await;
     assert_eq!(user_message(&other), "Slack 没有“own”这种登录方式。");
+}
+
+/// 登录框里填了别的中继（中继契约 server/slack-refresh v2）：在它上面登记，它回自己的 Slack Client ID，授权页与换码都用
+/// 这个应用，默认中继碰都不碰；凭据记下这个应用与中继地址。之后续期：Slack 要 Secret 时改经凭据里记着的那个中继。
+/// 没填地址、填的不是 https 来源都就地说原因。
+#[tokio::test]
+async fn a_chosen_relay_supplies_its_own_slack_app_and_renewals_go_through_it() {
+    let slack = MockServer::start().await;
+    mount_relay_as(
+        &slack,
+        json!({ "type": "code", "code": "c-2" }),
+        Some("111.222"),
+    )
+    .await;
+    Mock::given(method("POST"))
+        .and(path("/api/oauth.v2.access"))
+        .and(body_string_contains("code_verifier="))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "ok": true, "app_id": "A02",
+            "authed_user": {"id": ME, "scope": hhh_im_slack::USER_SCOPES.join(","),
+                "access_token": "xoxe.xoxp-own", "token_type": "user",
+                "refresh_token": "xoxe-own-1", "expires_in": 43200},
+            "team": {"id": TEAM}
+        })))
+        .mount(&slack)
+        .await;
+    mount_auth_for(
+        &slack,
+        "xoxe.xoxp-own",
+        &hhh_im_slack::USER_SCOPES.join(","),
+    )
+    .await;
+    Mock::given(method("POST"))
+        .and(path("/api/team.info"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(
+            json!({"ok": true, "team": {"id": TEAM, "name": "测试工作区", "icon": {}}}),
+        ))
+        .mount(&slack)
+        .await;
+    // 默认中继指到一个连不上的地址：填了中继地址就不碰它。
+    let unreachable = || {
+        let mut options = options(&slack);
+        options.relay_url = "http://localhost:1".into();
+        options
+    };
+    let host = Host::start(unreachable()).await;
+    let no_url = host.err("login/start", json!({ "method": "relay" })).await;
+    assert_eq!(user_message(&no_url), "请填写中继地址。");
+    let bad = host
+        .err(
+            "login/start",
+            json!({ "method": "relay", "values": { "relayUrl": "http://relay.example" } }),
+        )
+        .await;
+    assert_eq!(
+        user_message(&bad),
+        "中继地址要用 https（本机测试可以用 http://127.0.0.1）。"
+    );
+    assert!(host.next_within(Duration::from_millis(200)).await.is_none());
+    let started = host
+        .ok(
+            "login/start",
+            json!({ "method": "relay", "values": { "relayUrl": format!("{}/", relay_base(&slack)) } }),
+        )
+        .await;
+    let flow = started["flowId"].clone();
+    let step = host.expect_notification("login/step").await;
+    let url = reqwest::Url::parse(step["step"]["url"].as_str().unwrap()).unwrap();
+    let query: std::collections::HashMap<String, String> = url.query_pairs().into_owned().collect();
+    assert_eq!(query["client_id"], "111.222", "授权页用中继自己的应用");
+    assert_eq!(
+        query["redirect_uri"],
+        format!("{}/hhh-friend-im/slack/callback", relay_base(&slack))
+    );
+    let saved = host.expect_save(true).await;
+    let credential: Value = serde_json::from_str(saved["credential"].as_str().unwrap()).unwrap();
+    assert_eq!(credential["accessToken"], "xoxe.xoxp-own");
+    assert_eq!(credential["clientId"], "111.222");
+    assert_eq!(
+        credential["relayUrl"],
+        relay_base(&slack),
+        "记下填的中继（去掉末尾斜杠）"
+    );
+    assert_eq!(
+        host.expect_notification("login/finished").await["flowId"],
+        flow
+    );
+    host.expect_notification("session/notice").await;
+    let exchange = requests_to(&slack, "oauth.v2.access").await;
+    let fields = form(&exchange[0]);
+    assert_eq!(fields["client_id"], "111.222", "换码也用中继自己的应用");
+    assert_eq!(fields["code"], "c-2");
+    assert!(!fields.contains_key("client_secret"));
+
+    // 续期：本机被 Slack 要 Secret，改经凭据里记着的那个中继（默认中继仍连不上），应用照旧是中继的。
+    Mock::given(method("POST"))
+        .and(path("/api/oauth.v2.access"))
+        .and(body_string_contains("grant_type=refresh_token"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"ok": false, "error": "bad_client_secret"})),
+        )
+        .mount(&slack)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/slack/refresh"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"token": {
+            "access_token": "xoxe.xoxp-own-2", "refresh_token": "xoxe-own-2", "expires_in": 43200,
+            "token_type": "user", "scope": hhh_im_slack::USER_SCOPES.join(",")
+        }})))
+        .expect(1)
+        .mount(&slack)
+        .await;
+    mount_auth_for(
+        &slack,
+        "xoxe.xoxp-own-2",
+        &hhh_im_slack::USER_SCOPES.join(","),
+    )
+    .await;
+    let host = Host::start(unreachable()).await;
+    let expired = json!({
+        "version": 1, "accessToken": "xoxe.xoxp-own", "refreshToken": "xoxe-own-1",
+        "expiresAt": now_secs() - 10, "clientId": "111.222", "relayUrl": relay_base(&slack),
+        "workspace": "测试工作区"
+    })
+    .to_string();
+    let call = host.call(
+        "session/open",
+        json!({ "credential": expired, "settings": {} }),
+    );
+    let (open, saved) = tokio::join!(call, host.expect_save(true));
+    assert_eq!(open.unwrap()["state"], "online");
+    let saved: Value = serde_json::from_str(saved["credential"].as_str().unwrap()).unwrap();
+    assert_eq!(saved["accessToken"], "xoxe.xoxp-own-2");
+    assert_eq!(saved["clientId"], "111.222");
+    assert_eq!(saved["relayUrl"], relay_base(&slack));
+    let refreshes: Vec<_> = requests_to(&slack, "oauth.v2.access")
+        .await
+        .iter()
+        .map(form)
+        .filter(|fields| fields.get("grant_type").map(String::as_str) == Some("refresh_token"))
+        .collect();
+    assert_eq!(refreshes.len(), 1, "本机只试一次");
+    assert_eq!(refreshes[0]["client_id"], "111.222");
 }
 
 /// 已过期的授权开会话：先续期（HHH 的应用、刷新令牌只用一次），新的存好才上线；Slack 拒绝续期时请用户重新登录，

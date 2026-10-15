@@ -36,6 +36,9 @@
   - `session/expired` 和 `session/open` 的需要登录写重新登录卡片上的那几句（内置 Slack 的 `reauth_text`）。
 - 登录与续期照 Friend 内置时：HHH 的 Slack 应用（只要 Client ID）、PKCE、经授权中继领授权码；刷新令牌只能用一次，换到新的先经
   `credential/save` 存好、HHH 回了成功再用；交接来的旧授权若是用户自填的 Client ID 发的，续期照旧用那个 Client ID。
+  1.0.2 起登录框里有“通过中继登录”一种方式（`declare.rs`）：中继地址预填 HHH 的中继、用户可改；中继配了自己的 Slack 应用时
+  登记回执带它的 Client ID（中继契约 server/slack-refresh v2），登录、换码与续期都用它，凭据记下应用与中继（HHH 的不记）。
+  Slack 的回调只收 https，不做“自己的应用 + 本机回调”。
 - 已知的差别（用户看不出）：图片与头像经插件读进 HHH 的文件库再显示，不从 Slack 的 CDN 直接显示（飞书插件同样）。
 
 做不到一样时，不要在插件里绕路或伪造协议没有的东西。到 [hhh-im-sdk](https://github.com/MagicLizi/hhh-im-sdk/issues) 提 issue，

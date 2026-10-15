@@ -1,17 +1,20 @@
 //! 登录（protocol-v1 §6.1）：照 HHH Friend 内置 Slack 的登录（`server/im_login.rs` 的 Slack 一支、契约
-//! friend/im-auth-relay v1）。用户不用填任何东西：
+//! friend/im-auth-relay v1），只有「通过中继登录」一种方式（`declare.rs`）：登录框里的中继地址预填 HHH 的中继，直接点
+//! 登录和原来一样；用户也可以改成自己部署的中继。
 //!
-//! 1. 用 HHH 的 Slack 应用（只要 Client ID）生成授权页：一次性 state 与 PKCE 暗号只在本机内存；
-//! 2. 拿 state 在默认中继登记，登记成功才回 `{flowId}`、推“打开授权页”一步（登记不上就不打开：授权了也回不来）；
+//! 1. 拿一次性 state 在用户填的中继登记（旧宿主不带方式与地址时用默认中继），登记成功才回 `{flowId}`、推“打开授权页”
+//!    一步（登记不上就不打开：授权了也回不来）；中继配了自己的 Slack 应用时回执带它的 Client ID，没带就用 HHH 的应用；
+//! 2. 用这个应用（只要 Client ID）与同一个 state 生成授权页：state 与 PKCE 暗号只在本机内存；
 //! 3. 按中继建议的间隔领取，领到授权码拼回回调地址，本机用暗号换本人令牌（不要 Client Secret）；
-//! 4. 核验身份、读工作区名字，先经 `credential/save` 存好、宿主回了成功，再上线、发 `login/finished`（§6.1：先存后用）。
+//! 4. 核验身份、读工作区名字，凭据记下这次用的应用与中继（HHH 的不记），先经 `credential/save` 存好、宿主回了成功，
+//!    再上线、发 `login/finished`（§6.1：先存后用）。
 //!
 //! 同一时间只有一次登录：新的 `login/start` 取消没结束的旧的（旧的不再报结局）。说给用户的话同 Friend。
 
 use std::sync::Arc;
 use std::time::Duration;
 
-use hhh_im_protocol::method as pm;
+use hhh_im_protocol::method::{self as pm, login_value};
 use hhh_im_protocol::rpc::{RpcError, RpcId};
 use hhh_im_protocol::runtime::Host;
 use serde_json::json;
@@ -27,6 +30,15 @@ use crate::{AuthGrant, ErrorKind, LoginRequest, SlackAuth, SlackPendingLogin, US
 const RELAY_RETRY: Duration = Duration::from_secs(2);
 /// “打开授权页”一步里再打开一次的按钮文字（同飞书插件）。
 const OPEN_AGAIN: &str = "再打开一次";
+
+/// 「通过中继登录」的方式编号（`initialize.loginMethods`，宿主据此记“现在在用哪种”）。
+pub(crate) const RELAY_METHOD: &str = "relay";
+/// 页签上的名字（同飞书插件的同一种方式）。
+pub(crate) const RELAY_LABEL: &str = "通过中继登录";
+/// 页签下面一行说明。
+pub(crate) const RELAY_NOTE: &str = "经授权中继领回 Slack 的授权，令牌在本机换取、中继不保存。默认是 HHH 的中继；换成自己部署的中继时，要在它上面配好自己的 Slack 应用。";
+/// 中继地址输入框的占位文字（同飞书插件）。
+pub(crate) const RELAY_PLACEHOLDER: &str = "输入中继地址，https://…";
 
 const TIMED_OUT: &str = "Slack 登录等待已超时，请重新登录。";
 const CANCELLED: &str = "已取消 Slack 登录。";
@@ -53,12 +65,14 @@ pub(crate) struct Logins {
     next: std::sync::atomic::AtomicU64,
 }
 
-/// 备好的一次登录：授权页、在中继登记好的领取、换码用的应用。
+/// 备好的一次登录：授权页、在中继登记好的领取、换码用的应用，以及要记进凭据的应用编号与中继来源。
 struct Prepared {
     pending: SlackPendingLogin,
     relay: Relay,
     flow: relay::Flow,
     auth: SlackAuth,
+    /// 这次用的 Slack 应用：中继回的它自己的，或 HHH 的。
+    client_id: String,
 }
 
 /// 登录没完成时给用户的话（平台那边用户拒绝算取消）。
@@ -121,28 +135,25 @@ impl Server {
     }
 
     /// 备好授权页并在中继登记；不行时回给用户看的原因（同 Friend 开始登录时就地说）。
+    ///
+    /// 宿主带的方式只能是「通过中继登录」，中继地址是用户填的；旧宿主（不带方式）用默认中继。先在中继登记（拿到它的
+    /// Client ID，没有就用 HHH 的应用），再用同一个 state 拼授权页。
     async fn prepare_login(&self, params: &pm::LoginStartParams) -> Result<Prepared, RpcError> {
-        // Slack 不声明登录方式，宿主不带方式；带了说明宿主与插件对不上。
-        if let Some(method) = params.method.as_deref() {
-            return Err(rpc_error(
-                ErrorKind::InvalidRequest,
-                format!("Slack 没有“{method}”这种登录方式。"),
-            ));
-        }
-        let relay = Relay::new(&self.options.relay_url)
-            .map_err(|reason| rpc_error(ErrorKind::InvalidRequest, reason))?;
-        let auth = SlackAuth::new(self.options.config.clone(), BUILTIN_CLIENT_ID)
-            .map_err(|error| error.rpc())?;
-        let pending = auth
-            .begin_login(LoginRequest {
-                redirect_uri: relay.callback_url(),
-                scopes: USER_SCOPES
-                    .iter()
-                    .map(|scope| (*scope).to_owned())
-                    .collect(),
-            })
-            .map_err(|error| error.rpc())?;
-        let flow = relay.register(pending.state()).await.map_err(|error| {
+        let refuse = |message: String| rpc_error(ErrorKind::InvalidRequest, message);
+        let relay_url = match params.method.as_deref() {
+            None => self.options.relay_url.clone(),
+            Some(RELAY_METHOD) => params
+                .values
+                .get(login_value::RELAY_URL)
+                .map(|value| value.trim())
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| refuse("请填写中继地址。".into()))?
+                .to_owned(),
+            Some(other) => return Err(refuse(format!("Slack 没有“{other}”这种登录方式。"))),
+        };
+        let relay = Relay::new(&relay_url).map_err(refuse)?;
+        let state = SlackAuth::new_state().map_err(|error| error.rpc())?;
+        let registered = relay.register(&state).await.map_err(|error| {
             rpc_error(
                 if error.transient {
                     ErrorKind::Disconnected
@@ -152,11 +163,42 @@ impl Server {
                 error.message,
             )
         })?;
+        let relay_app = registered.client_id.is_some();
+        let client_id = registered
+            .client_id
+            .unwrap_or_else(|| BUILTIN_CLIENT_ID.to_owned());
+        let auth =
+            SlackAuth::new(self.options.config.clone(), client_id.as_str()).map_err(|error| {
+                if relay_app {
+                    tracing::error!("授权回调服务回的 Slack Client ID 不合规");
+                    refuse("授权回调服务给的 Slack 应用编号不合规，暂时不能登录。".into())
+                } else {
+                    error.rpc()
+                }
+            })?;
+        let pending = auth
+            .begin_login_with_state(
+                LoginRequest {
+                    redirect_uri: relay.callback_url(),
+                    scopes: USER_SCOPES
+                        .iter()
+                        .map(|scope| (*scope).to_owned())
+                        .collect(),
+                },
+                state,
+            )
+            .map_err(|error| error.rpc())?;
+        tracing::info!(
+            relay_app,
+            own_relay = relay::stored_relay_url(relay.origin()).is_some(),
+            "Slack 授权页已备好"
+        );
         Ok(Prepared {
             pending,
             relay,
-            flow,
+            flow: registered.flow,
             auth,
+            client_id,
         })
     }
 
@@ -172,6 +214,7 @@ impl Server {
             relay,
             flow,
             auth,
+            client_id,
         } = prepared;
         let mut wait = self.options.relay_first_poll;
         let claim = loop {
@@ -202,13 +245,17 @@ impl Server {
         };
         let callback = relay.callback_with(&flow, &claim);
         match auth.finish_login(pending, &callback).await {
-            Ok(login) => self.finish_login(&flow_id, login.grant).await,
+            Ok(login) => {
+                self.finish_login(&flow_id, login.grant, client_id, relay.origin())
+                    .await
+            }
             Err(error) => self.fail_login(&flow_id, failed(&error)).await,
         }
     }
 
-    /// 拿到授权：核验身份、读工作区名字，先存凭据、宿主回了成功，再上线、发 `login/finished`，接着报问题行。
-    async fn finish_login(&self, flow_id: &str, grant: AuthGrant) {
+    /// 拿到授权：核验身份、读工作区名字，凭据记下这次用的应用与中继（HHH 的不记），先存凭据、宿主回了成功，再上线、
+    /// 发 `login/finished`，接着报问题行。
+    async fn finish_login(&self, flow_id: &str, grant: AuthGrant, client_id: String, relay: &str) {
         let client = match self.connect(grant.clone()).await {
             Ok(client) => client,
             Err(error) => {
@@ -217,7 +264,13 @@ impl Server {
                     .await;
             }
         };
-        let mut credential = Credential::new(&grant, None);
+        let mut credential =
+            Credential::new(&grant, Some(client_id).filter(|id| id != BUILTIN_CLIENT_ID));
+        credential.relay_url = relay::stored_relay_url(relay);
+        let (relay_app, own_relay) = (
+            credential.client_id.is_some(),
+            credential.relay_url.is_some(),
+        );
         credential.account = Some(KnownAccount {
             id: client.account().user_id.clone(),
             name: client.account().name.clone(),
@@ -245,7 +298,7 @@ impl Server {
             .await;
         }
         self.end_login(flow_id).await;
-        tracing::info!(flow = flow_id, "Slack 登录完成");
+        tracing::info!(flow = flow_id, relay_app, own_relay, "Slack 登录完成");
         self.host.notify(
             hhh_im_protocol::Method::LoginFinished.as_str(),
             pm::LoginFinishedParams {

@@ -1,10 +1,11 @@
-//! `initialize`（protocol-v1 §4.1、§5）：插件信息、平台说明与能力，照 HHH 内置 Slack 的平台表（`im_client.rs` 的
-//! `PLATFORM`）一项一项写出来。`tests/fixtures/initialize.json` 锁住结果，HHH 那边拿它与内置的平台表逐项对照。
+//! `initialize`（protocol-v1 §4.1、§5）：插件信息、平台说明、能力与登录方式，照 HHH 内置 Slack 的平台表（`im_client.rs`
+//! 的 `PLATFORM`）一项一项写出来。`tests/fixtures/initialize.json` 锁住结果，HHH 那边拿它与内置的平台表逐项对照。
 //!
-//! 不声明登录方式：内置 Slack 用 HHH 的 Slack 应用，用户不用填任何东西，点“登录”就打开授权页（宿主见没有登录方式时
-//! 直接开始登录）。
+//! 登录方式只有「通过中继登录」一种（契约 provider-protocol v12 缺口 6 的 `relay`）：中继地址框预填 HHH 的中继
+//! （v14 的 `defaultValue`），直接点登录和原来一样；用户可以改成自己部署的中继。Slack 的 OAuth 回调只收 https，所以
+//! 没有飞书那种“自己的应用 + 本机回调”。
 
-use hhh_im_protocol::method as pm;
+use hhh_im_protocol::method::{self as pm, LoginKind, LoginMethod};
 use hhh_im_protocol::platform::{
     ActionRules, Adjustable, AvatarIdentity, AvatarShape, Broadcast, Capabilities,
     ConversationCaps, ConversationNouns, DiscoveryDesc, EditRule, EmojiRules, HistoryMode, Limits,
@@ -14,6 +15,8 @@ use hhh_im_protocol::platform::{
 use hhh_im_protocol::rpc::RpcError;
 use serde_json::Value;
 
+use super::login;
+use super::relay::DEFAULT_RELAY;
 use crate::slack::{HISTORY_PAGE_MAX, UPLOAD_MAX_BYTES, methods::PEOPLE_BATCH_MAX};
 use crate::{AVATAR_KEY_PATTERN, AVATAR_VARIANT_PATTERN, EMOJI_NAME_PATTERN, ErrorKind};
 
@@ -180,6 +183,26 @@ pub(crate) fn capabilities() -> Capabilities {
     }
 }
 
+/// 登录方式：只有「通过中继登录」，中继框预填 HHH 的中继、用户可改；叫法与飞书插件的同一种方式一样。
+pub(crate) fn login_methods() -> Vec<LoginMethod> {
+    vec![LoginMethod {
+        id: login::RELAY_METHOD.into(),
+        kind: LoginKind::Relay,
+        label: login::RELAY_LABEL.into(),
+        note: login::RELAY_NOTE.into(),
+        placeholder: Some(login::RELAY_PLACEHOLDER.into()),
+        default_value: Some(DEFAULT_RELAY.into()),
+        id_label: None,
+        id_placeholder: None,
+        secret_label: None,
+        secret_placeholder: None,
+        secret_help: None,
+        callback_path: None,
+        callback_help: None,
+        create_link: None,
+    }]
+}
+
 /// `initialize` 的结果。宿主只说得出别的协议版本时拒绝。
 pub(crate) fn initialize(params: pm::InitializeParams) -> Result<Value, RpcError> {
     if !params
@@ -206,7 +229,7 @@ pub fn result() -> Value {
         platform: platform(),
         capabilities: capabilities(),
         settings: Vec::new(),
-        login_methods: Vec::new(),
+        login_methods: login_methods(),
         actions: Vec::new(),
     })
     .expect("握手结果总能写成 JSON")
@@ -225,10 +248,24 @@ mod tests {
         assert_eq!(value["provider"]["id"], "slack");
         assert_eq!(value["capabilities"]["people"]["bots"], true);
         assert_eq!(value["capabilities"]["people"]["batchMax"], 2000);
-        assert!(
-            value
-                .get("loginMethods")
-                .is_none_or(|methods| methods.as_array().is_some_and(Vec::is_empty))
-        );
+        // 只有「通过中继登录」一种，预填 HHH 的中继（https）；文字在宿主的预算内。
+        let methods = value["loginMethods"].as_array().unwrap();
+        assert_eq!(methods.len(), 1);
+        assert_eq!(methods[0]["kind"], "relay");
+        assert_eq!(methods[0]["id"], "relay");
+        assert_eq!(methods[0]["defaultValue"], DEFAULT_RELAY);
+        assert!(DEFAULT_RELAY.starts_with("https://"));
+        for text in [
+            login::RELAY_LABEL,
+            login::RELAY_NOTE,
+            login::RELAY_PLACEHOLDER,
+        ] {
+            let count = text.chars().count();
+            assert!(
+                (1..=hhh_im_protocol::budget::LOGIN_TEXT_MAX_CHARS).contains(&count),
+                "{text}"
+            );
+        }
+        assert!(methods[0].get("callbackPath").is_none());
     }
 }

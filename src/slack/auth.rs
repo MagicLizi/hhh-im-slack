@@ -110,9 +110,23 @@ impl SlackAuth {
         })
     }
 
+    /// 一次登录的一次性 state（同 [`Self::begin_login`] 自己生成的那种）：先在授权中继登记、再拼授权页时由调用方生成。
+    pub fn new_state() -> Result<String> {
+        random_id()
+    }
+
     /// 生成授权页地址。`redirect_uri` 必须是已登记到 Slack 后台的地址：http 只接受主机名
     /// `localhost`（Slack 只把它当本机回调），其余一律 https；端口要与登记的一致。
     pub fn begin_login(&self, request: LoginRequest) -> Result<SlackPendingLogin> {
+        self.begin_login_with_state(request, random_id()?)
+    }
+
+    /// 同 [`Self::begin_login`]，state 由调用方给（已在授权中继登记的那一个）。
+    pub fn begin_login_with_state(
+        &self,
+        request: LoginRequest,
+        state: String,
+    ) -> Result<SlackPendingLogin> {
         let redirect = Url::parse(&request.redirect_uri)
             .map_err(|_| Error::new(ErrorKind::InvalidRequest, "授权回调地址格式不正确。"))?;
         let local = redirect.scheme() == "http" && redirect.host_str() == Some("localhost");
@@ -145,7 +159,6 @@ impl SlackAuth {
             ));
         }
         let verifier = random_verifier()?;
-        let state = random_id()?;
         let mut url = Url::parse(&self.config.authorize_url)
             .map_err(|_| Error::new(ErrorKind::InvalidRequest, "Slack 授权地址格式不正确。"))?;
         url.query_pairs_mut()

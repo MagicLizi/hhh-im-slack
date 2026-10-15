@@ -4,6 +4,9 @@
 //! Slack 用 PKCE，不要 Client Secret：插件先用授权页里的一次性 state 在中继登记（不要中继代换令牌），成功后才把授权页
 //! 交给宿主打开，之后按中继建议的间隔领取。领到的是授权码（或平台给的错误），拼回回调地址后在本机用暗号换令牌。
 //! 领取凭证与授权码只在内存，不写日志。协议正本在独立仓库 hhh-im-callback-server 的 README。
+//!
+//! 中继地址是用户在登录框里填的（预填 HHH 的中继 [`DEFAULT_RELAY`]）。中继配了自己的 Slack 应用时，登记回执带它的
+//! Client ID（契约 server/slack-refresh v2），授权页、换码与续期都用这个应用；没带就用 HHH 的应用。
 
 use std::time::{Duration, Instant};
 
@@ -27,7 +30,16 @@ const RELAY_MESSAGE_MAX_CHARS: usize = 120;
 #[derive(Clone)]
 pub(crate) struct Relay {
     base: Url,
+    /// 来源（不带末尾斜杠）：存进凭据、续期时再用。
+    origin: String,
     http: reqwest::Client,
+}
+
+/// 在中继登记好的一次登录：领取用的 [`Flow`]，以及中继配了自己的 Slack 应用时回的 Client ID（契约 server/slack-refresh
+/// v2；旧中继、没配应用的中继不回）。
+pub(crate) struct Registered {
+    pub(crate) flow: Flow,
+    pub(crate) client_id: Option<String>,
 }
 
 /// 在中继登记好的一次登录：state 与领取凭证只在内存；Debug 不显示它们。
@@ -99,6 +111,9 @@ struct Created {
     claim_token: String,
     callback_url: String,
     expires_in: u64,
+    /// 中继上 Slack 应用的 Client ID（配了才有）。
+    #[serde(default)]
+    client_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -160,10 +175,16 @@ fn parse_relay_url(raw: &str) -> Result<Url, String> {
     Ok(url)
 }
 
+/// 存进凭据的中继来源：默认中继不记（续期时用程序自带的默认值），别的照记。
+pub(crate) fn stored_relay_url(origin: &str) -> Option<String> {
+    (origin != DEFAULT_RELAY).then(|| origin.to_owned())
+}
+
 impl Relay {
     /// 一个中继（地址已核对过）。
     pub(crate) fn new(raw: &str) -> Result<Self, String> {
         let base = parse_relay_url(raw)?;
+        let origin = base.as_str().trim_end_matches('/').to_owned();
         let http = crate::net::client_builder()
             .redirect(reqwest::redirect::Policy::none())
             .connect_timeout(CONNECT_TIMEOUT)
@@ -174,7 +195,12 @@ impl Relay {
                 tracing::error!(%cause, "IM 授权中继客户端建立失败");
                 format!("授权回调服务客户端建立失败：{cause}")
             })?;
-        Ok(Self { base, http })
+        Ok(Self { base, origin, http })
+    }
+
+    /// 中继的来源（不带末尾斜杠）。
+    pub(crate) fn origin(&self) -> &str {
+        &self.origin
     }
 
     /// 登记在 Slack 应用后台的回调地址。
@@ -191,8 +217,8 @@ impl Relay {
     }
 
     /// 用授权页里的 state 登记一次登录（不要中继代换令牌）。中继回的 state 与回调地址必须与本机一致，否则说明中继的
-    /// 公网地址配置不符，登记作废（不能把用户带去一个回不来的地址）。
-    pub(crate) async fn register(&self, state: &str) -> Result<Flow, RelayError> {
+    /// 公网地址配置不符，登记作废（不能把用户带去一个回不来的地址）。回执带 Client ID 时一并带回（空白的当没带）。
+    pub(crate) async fn register(&self, state: &str) -> Result<Registered, RelayError> {
         let started = Instant::now();
         let body = serde_json::json!({ "platform": PLATFORM, "state": state });
         let response = self
@@ -230,16 +256,24 @@ impl Relay {
                 transient: false,
             });
         }
+        let client_id = created
+            .client_id
+            .map(|id| id.trim().to_owned())
+            .filter(|id| !id.is_empty());
         tracing::info!(
             platform = PLATFORM,
             exchange = false,
+            relay_app = client_id.is_some(),
             elapsed_ms = started.elapsed().as_millis() as u64,
             "IM 授权已在中继登记"
         );
-        Ok(Flow {
-            state: created.state,
-            claim_token: created.claim_token,
-            expires_at: Instant::now() + Duration::from_secs(created.expires_in),
+        Ok(Registered {
+            flow: Flow {
+                state: created.state,
+                claim_token: created.claim_token,
+                expires_at: Instant::now() + Duration::from_secs(created.expires_in),
+            },
+            client_id,
         })
     }
 
@@ -419,5 +453,23 @@ mod tests {
                 .ends_with("?state=s1&error=access_denied")
         );
         assert!(!format!("{:?}", Claim::Code("secret".into())).contains("secret"));
+    }
+
+    /// 用户填的地址写成来源（不带末尾斜杠）；默认中继不进凭据，别的照记。
+    #[test]
+    fn user_relay_urls_are_normalised_and_only_other_relays_are_stored() {
+        assert_eq!(
+            Relay::new(" https://relay.example/ ").unwrap().origin(),
+            "https://relay.example"
+        );
+        assert_eq!(
+            Relay::new("http://127.0.0.1:18080").unwrap().origin(),
+            "http://127.0.0.1:18080"
+        );
+        assert_eq!(stored_relay_url(DEFAULT_RELAY), None);
+        assert_eq!(
+            stored_relay_url("https://relay.example").as_deref(),
+            Some("https://relay.example")
+        );
     }
 }

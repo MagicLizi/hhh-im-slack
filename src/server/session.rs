@@ -172,7 +172,8 @@ fn missing_scopes_text(missing: &[String]) -> String {
 
 /// 开会话的结局：在线（第二项：这次已经存过凭据），或需要登录（原因与说明）。
 enum Opened {
-    Online(Online, bool),
+    /// 在线的那份装在 Box 里：凭据连着客户端很大，别让“需要登录”那一支也占这么多。
+    Online(Box<Online>, bool),
     NeedsLogin(ReauthReason, String),
 }
 
@@ -217,7 +218,7 @@ impl Server {
         match self.establish(saved.clone(), read_only).await? {
             Opened::Online(online, _) => {
                 let account = account(&online.client, &online.credential);
-                self.go_online(online).await;
+                self.go_online(*online).await;
                 Ok(serde_json::to_value(pm::SessionOpenResult::Online {
                     account,
                     adopted_settings: None,
@@ -253,7 +254,7 @@ impl Server {
         };
         let known = credential.account.clone();
         let (online, saved) = match self.establish(credential, read_only).await? {
-            Opened::Online(online, saved) => (online, saved),
+            Opened::Online(online, saved) => (*online, saved),
             Opened::NeedsLogin(reason, message) => {
                 tracing::warn!(?reason, "内置 Slack 交来的授权已经失效，不接");
                 *self.state.write().await = State::Closed { saved: None };
@@ -348,11 +349,11 @@ impl Server {
                         }
                     }
                     return Ok(Opened::Online(
-                        Online {
+                        Box::new(Online {
                             client: Arc::new(client),
                             credential,
                             read_only,
-                        },
+                        }),
                         saved,
                     ));
                 }
@@ -398,15 +399,23 @@ impl Server {
         SlackClient::connect(self.options.config.clone(), grant, self.caches.clone()).await
     }
 
-    /// 用发出这份授权的应用续期：旧版本自填的 Client ID，或 HHH 的应用。Slack 以缺 Client Secret 拒绝时（经 https 回调
-    /// 登录拿到的授权，HHH 契约 friend/im-auth-relay v7）改经登录用的那个授权中继续期；这样拒绝不耗刷新令牌。
+    /// 用发出这份授权的应用续期：旧版本自填的 Client ID、登录用的中继自己的应用，或 HHH 的应用。Slack 以缺 Client
+    /// Secret 拒绝时（经 https 回调登录拿到的授权，HHH 契约 friend/im-auth-relay v7）改经登录用的那个授权中继续期
+    /// （凭据里记着的；没记的是默认中继）；这样拒绝不耗刷新令牌。
     async fn refresh(&self, credential: &Credential, grant: &AuthGrant) -> Result<AuthGrant> {
         let client_id = credential.client_id.as_deref().unwrap_or(BUILTIN_CLIENT_ID);
         let auth = SlackAuth::new(self.options.config.clone(), client_id)?;
         match auth.refresh(grant).await {
             Err(error) if error.platform_code.as_deref() == Some("bad_client_secret") => {
-                tracing::info!("Slack 要 Client Secret 才能续这份授权，改经授权中继续期");
-                auth.refresh_via_relay(&self.options.relay_url, grant).await
+                let relay = credential
+                    .relay_url
+                    .as_deref()
+                    .unwrap_or(&self.options.relay_url);
+                tracing::info!(
+                    own_relay = credential.relay_url.is_some(),
+                    "Slack 要 Client Secret 才能续这份授权，改经登录用的授权中继续期"
+                );
+                auth.refresh_via_relay(relay, grant).await
             }
             other => other,
         }

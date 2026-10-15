@@ -49,6 +49,16 @@
       "renew": true
     }
   },
+  "loginMethods": [
+    {
+      "defaultValue": "https://hhh-im-auth.magiclizi.com",
+      "id": "relay",
+      "kind": "relay",
+      "label": "通过中继登录",
+      "note": "经授权中继领回 Slack 的授权，令牌在本机换取、中继不保存。默认是 HHH 的中继；换成自己部署的中继时，要在它上面配好自己的 Slack 应用。",
+      "placeholder": "输入中继地址，https://…"
+    }
+  ],
   "platform": {
     "actions": {
       "edit": {
@@ -131,7 +141,7 @@
   "provider": {
     "id": "slack",
     "name": "Slack",
-    "version": "1.0.1"
+    "version": "1.0.2"
   },
   "settings": []
 }

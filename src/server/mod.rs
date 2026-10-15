@@ -32,7 +32,8 @@ pub(crate) const BUILTIN_CLIENT_ID: &str = "2372848536.12176806034562";
 pub struct Options {
     /// Slack 的服务地址。
     pub config: SlackConfig,
-    /// 授权回调中继的来源。
+    /// 授权回调中继的来源：旧宿主（`login/start` 不带方式与地址）登录时用，以及凭据里没记中继的授权续期时用；
+    /// 登录框里填了的以填的为准。
     pub relay_url: String,
     /// 打开授权页后多久第一次领取结果（之后按中继建议的间隔）。
     pub relay_first_poll: Duration,

@@ -1,6 +1,7 @@
 //! 插件自己的凭据（protocol-v1 §6.2）：宿主只管存和还，内容由插件定。重新上线要的全在里面——本人授权（访问令牌、
-//! 刷新令牌、过期时刻、权限），以及发出这份授权的 Slack 应用（续期要用同一个 Client ID；新登录一律是 HHH 的应用，
-//! 不记）。另记上次核验的账号与工作区名字：账号只用来核对，工作区名字卡片上要写（不必每次上线都读一遍）。
+//! 刷新令牌、过期时刻、权限），发出这份授权的 Slack 应用（续期要用同一个 Client ID；HHH 的应用不记），以及登录用的
+//! 授权中继（续期经同一个中继；HHH 的默认中继不记）。另记上次核验的账号与工作区名字：账号只用来核对，工作区名字
+//! 卡片上要写（不必每次上线都读一遍）。
 //!
 //! 附录 D 的交接（`hhh-builtin-v1`）也在这里换成插件的凭据：HHH 内置 Slack 的授权与连接设置那一栏
 //! （`clientId`、`accountName`、`workspaceName`…）。
@@ -37,9 +38,13 @@ pub(crate) struct Credential {
     expires_at: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     scopes: Option<Vec<String>>,
-    /// 发出这份授权的 Slack 应用：旧版本里用户自己填的 Client ID（交接来的）；HHH 的应用不写。
+    /// 发出这份授权的 Slack 应用：旧版本里用户自己填的 Client ID（交接来的），或登录用的中继回的它自己的应用；
+    /// HHH 的应用不写。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) client_id: Option<String>,
+    /// 登录用的授权中继来源（用户在登录框里填的；续期经同一个中继）；HHH 的默认中继不写。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) relay_url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) account: Option<KnownAccount>,
     /// 工作区名字（卡片写“名字 · 工作区”）；读不到时不写。
@@ -53,6 +58,7 @@ impl std::fmt::Debug for Credential {
             .field("tokens", &"[已隐藏]")
             .field("expires_at", &self.expires_at)
             .field("client_id", &self.client_id)
+            .field("relay_url", &self.relay_url)
             .finish()
     }
 }
@@ -67,6 +73,7 @@ impl Credential {
             expires_at: grant.expires_at(),
             scopes: grant.scopes().map(<[String]>::to_vec),
             client_id,
+            relay_url: None,
             account: None,
             workspace: None,
         }
@@ -93,9 +100,10 @@ impl Credential {
         )
     }
 
-    /// 换了一份授权（续期）：应用、账号与工作区照旧。
+    /// 换了一份授权（续期）：应用、中继、账号与工作区照旧。
     pub(crate) fn with_grant(&self, grant: &AuthGrant) -> Self {
         Self {
+            relay_url: self.relay_url.clone(),
             account: self.account.clone(),
             workspace: self.workspace.clone(),
             ..Self::new(grant, self.client_id.clone())
@@ -231,10 +239,12 @@ mod tests {
         .unwrap();
         let mut credential = Credential::new(&grant, Some("123.456".into()));
         credential.workspace = Some("示例工作区".into());
+        credential.relay_url = Some("https://relay.example".into());
         let text = credential.to_text();
         let back = Credential::parse(&text).unwrap();
         assert_eq!(back.grant().unwrap().refresh_token(), Some("xoxe-refresh"));
         assert_eq!(back.client_id.as_deref(), Some("123.456"));
+        assert_eq!(back.relay_url.as_deref(), Some("https://relay.example"));
         assert_eq!(back.workspace.as_deref(), Some("示例工作区"));
         assert_eq!(back.renew_at_ms(), Some((10_000 - 300) * 1000));
         let renewed = back
@@ -244,14 +254,20 @@ mod tests {
             Some("123.456"),
             "续期照旧用那个应用"
         );
+        assert_eq!(
+            renewed.relay_url.as_deref(),
+            Some("https://relay.example"),
+            "续期照旧经那个中继"
+        );
         assert_eq!(renewed.workspace.as_deref(), Some("示例工作区"));
         assert_eq!(renewed.renew_at_ms(), None, "没有刷新令牌不排续期");
         let shown = format!("{credential:?}");
         assert!(!shown.contains("xoxe.xoxp-access") && !shown.contains("xoxe-refresh"));
         assert!(Credential::parse("{\"version\":9}").is_none());
+        let builtin = Credential::new(&grant, None).to_text();
         assert!(
-            !Credential::new(&grant, None).to_text().contains("clientId"),
-            "HHH 的应用不记 Client ID"
+            !builtin.contains("clientId") && !builtin.contains("relayUrl"),
+            "HHH 的应用与默认中继都不记"
         );
     }
 
