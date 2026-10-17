@@ -73,7 +73,7 @@
 ## 清单 `hhh-im-provider.json`
 
 `id` 是 `slack`，**不能改**：HHH 靠它认出这个插件和内置 Slack 的旧记录，而且它是保留编号，只认官方签名。`imType` 也是 `slack`。
-`version` 和 `Cargo.toml` 的版本保持一致，`tests/manifest.rs` 会核对。目前 `os` 只写 `windows`，只发 `windows-x64` 的包。
+`version` 和 `Cargo.toml` 的版本保持一致，`tests/manifest.rs` 会核对。当前发 `windows-x64` 与 macOS 包。
 
 ## 发版本
 

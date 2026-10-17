@@ -4,7 +4,7 @@
   "name": "Slack",
   "version": "1.0.2",
   "command": "hhh-im-slack",
-  "os": ["windows"],
+  "os": ["windows", "macos"],
   "logo": "logo.svg",
   "logoStyle": "mark",
   "logoInk": { "x": 0.0, "y": 0.0, "width": 122.8, "height": 122.8 },

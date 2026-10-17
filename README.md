@@ -59,7 +59,7 @@ hhh-im-check dist/stage/hhh-im-provider.json
 
 ## 发版本
 
-Slack 是官方插件：HHH 只认官方私钥签过名的版本索引。目前只发 Windows 的包（`windows-x64`）。
+Slack 是官方插件：HHH 只认官方私钥签过名的版本索引。目前发 Windows（`windows-x64`）与 macOS（本机按架构生成 `macos-arm64` 或 `macos-x64`）的包。
 
 1. 改清单 `hhh-im-provider.json` 和 `Cargo.toml` 里的 `version`，写好 `notes.md`（给用户看的更新说明）。
 2. 提交，打标签 `v<版本>`，推送提交和标签。
@@ -81,7 +81,7 @@ Slack 是官方插件：HHH 只认官方私钥签过名的版本索引。目前�
 | `src/server/` | 协议方法：握手声明、登录、续期、交接、读取与动作 |
 | `tests/fixtures/slack/` | Slack 响应的取样（人名、编号和内容都是编的） |
 | `tests/fixtures/slack-protocol/` | 协议样例：插件发给 HHH 的线上消息与握手结果。这些样例会拷进 HHH，用宿主真正的翻译再核对一遍 |
-| `scripts/pack.ps1` | 打包与发布 |
+| `scripts/pack.ps1`、`scripts/pack.sh` | 打包与发布 |
 
 ## 许可证
 
