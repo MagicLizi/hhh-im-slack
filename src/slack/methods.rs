@@ -588,7 +588,8 @@ impl SlackClient {
 
     /// 人名册按编号读一批（`people/get`，契约 client v23 §4，2026-10-02 真实取样）：人少逐个 `users.info`，人多先读
     /// 工作区名单（含停用的人与机器人用户，读到一页里全齐了就停），名单里没有的（外部工作区的人）再逐个读；机器人逐个
-    /// `bots.info`。`user_not_found`、`bot_not_found` 算没有，这次没读到的两边都不放（宿主下次再读）；不走本机的用户资料
+    /// `bots.info`。`user_not_found`、`bot_not_found` 算没有；`user_not_visible` 只跳过这个人，不标成不存在。
+    /// 这次没读到的两边都不放（宿主下次再读）；不走本机的用户资料
     /// 缓存（人名册自己按刷新间隔判断过期），读到的人顺手更新缓存。
     pub(crate) async fn look_up_people(
         &self,
@@ -626,6 +627,9 @@ impl SlackClient {
         for id in users.into_iter().take(PEOPLE_USERS_INFO_MAX) {
             match self.user(id).await {
                 Ok(user) => read.push(user),
+                Err(error) if error.platform_code.as_deref() == Some("user_not_visible") => {
+                    tracing::debug!("Slack 用户对当前账号不可见，这次跳过，保留其他人的资料");
+                }
                 Err(error) if error.kind == ErrorKind::NotFound => {
                     result.missing.push(id.to_owned())
                 }

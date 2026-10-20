@@ -144,6 +144,114 @@ async fn a_few_people_and_bots_are_read_one_by_one_and_not_found_means_missing()
     );
 }
 
+// 一个人不可见只影响他自己，前后正常人的名字和头像都要保留。
+#[tokio::test]
+async fn an_invisible_user_does_not_block_other_people() {
+    let ids = ["U00000000A", "U00000000B", "U00000000C"];
+    for invisible in ids {
+        let slack = MockServer::start().await;
+        let host = online(&slack).await;
+        for id in ids {
+            let response = if id == invisible {
+                json!({ "ok": false, "error": "user_not_visible" })
+            } else {
+                json!({ "ok": true, "user": user(id, "同事", false, false) })
+            };
+            answer(&slack, "users.info", &format!("user={id}"), response).await;
+        }
+        let result = host.ok("people/get", json!({ "ids": ids })).await;
+        let expected: Vec<_> = ids
+            .iter()
+            .filter(|id| **id != invisible)
+            .map(|id| {
+                (
+                    (*id).to_owned(),
+                    Some("同事".to_owned()),
+                    Some(format!("https://avatars.slack-edge.com/{id}_72.png")),
+                )
+            })
+            .collect();
+        assert_eq!(
+            found(&result),
+            expected,
+            "不可见用户在批次首、中、尾都不能影响别人"
+        );
+        assert_eq!(
+            result["missing"],
+            json!([]),
+            "不可见不代表不存在，之后仍可再读"
+        );
+        assert_eq!(result["platformRequests"], 3);
+        assert_eq!(requests_to(&slack, "users.info").await.len(), 3);
+    }
+}
+
+// 先读到工作区名单，再遇到不可见的外部用户，也不能把整份名单丢掉。
+#[tokio::test]
+async fn an_invisible_straggler_does_not_discard_directory_people() {
+    let slack = MockServer::start().await;
+    let host = online(&slack).await;
+    let ids: Vec<String> = (1..=12).map(|i| format!("U0000001{i:02}")).collect();
+    answer(
+        &slack,
+        "users.list",
+        "limit=1000",
+        json!({ "ok": true,
+            "members": ids[..11].iter().map(|id| user(id, "同事", false, false)).collect::<Vec<_>>()
+        }),
+    )
+    .await;
+    answer(
+        &slack,
+        "users.info",
+        &format!("user={}", ids[11]),
+        json!({ "ok": false, "error": "user_not_visible" }),
+    )
+    .await;
+    let result = host.ok("people/get", json!({ "ids": ids })).await;
+    let expected: Vec<_> = ids[..11]
+        .iter()
+        .map(|id| {
+            (
+                id.clone(),
+                Some("同事".to_owned()),
+                Some(format!("https://avatars.slack-edge.com/{id}_72.png")),
+            )
+        })
+        .collect();
+    assert_eq!(found(&result), expected);
+    assert_eq!(result["missing"], json!([]), "不可见不标成不存在");
+    assert_eq!(result["platformRequests"], 2);
+}
+
+// 账号级或暂时错误不能伪装成人员不存在，也不能放大成继续逐人请求。
+#[tokio::test]
+async fn account_and_service_errors_still_fail_people_lookup() {
+    use hhh_im_protocol::ErrorKind;
+    for (code, kind) in [
+        ("missing_scope", ErrorKind::PermissionDenied),
+        ("invalid_auth", ErrorKind::AuthExpired),
+        ("ratelimited", ErrorKind::RateLimited),
+        ("internal_error", ErrorKind::Disconnected),
+        ("unknown_people_error", ErrorKind::ProtocolError),
+    ] {
+        let slack = MockServer::start().await;
+        let host = online(&slack).await;
+        answer(
+            &slack,
+            "users.info",
+            "user=U00000000A",
+            json!({"ok": false, "error": code}),
+        )
+        .await;
+        let error = host
+            .err("people/get", json!({ "ids": ["U00000000A", "U00000000B"] }))
+            .await;
+        assert_eq!(kind_of(&error), kind, "{code}");
+        assert_eq!(requests_to(&slack, "users.info").await.len(), 1, "{code}");
+    }
+}
+
 // 人多先读工作区名单（含停用的人与机器人用户），一页里全齐了就不往下读；名单里没有的（外部工作区的人）
 // 再逐个读（契约 client v23 §4）。
 #[tokio::test]
