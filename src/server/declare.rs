@@ -121,8 +121,9 @@ pub(crate) fn platform() -> PlatformDesc {
             text_pattern: None,
             white_background: false,
         }),
-        // 新版搜索 `assistant.search.context`（契约 client v29，2026-10-04 取样）：每页 20 条、发出后 15–30 秒收录；
-        // 限额按用户每分钟约 10 次、翻页也算，最快 30 秒一次。
+        // 不声明账号级 `recentActivity`：新版搜索官方只许响应用户操作，不许后台持续查。宿主据此改做逐会话限频发现：
+        // `users.conversations` 一页列一批会话，每个同步范围以外的再用一次 `conversations.history` 探测；
+        // `pages` / `cold_pages` 是一次读取最多翻几页会话列表，请求走上面的读取额度、按后台一级排队。
         discovery: Some(DiscoveryDesc {
             fastest_secs: 30,
             pages: 5,
@@ -144,7 +145,7 @@ pub(crate) fn capabilities() -> Capabilities {
             search: true,
             members: true,
             find_direct: true,
-            recent_activity: true,
+            recent_activity: false,
         },
         messages: MessageCaps {
             list: true,

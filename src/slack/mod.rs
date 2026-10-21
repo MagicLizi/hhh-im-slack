@@ -53,14 +53,10 @@ pub const USER_SCOPES: &[&str] = &[
     "emoji:read",
     "team:read",
     "usergroups:read",
-    // 会话发现（契约 client v29 §2）：新版搜索 `assistant.search.context` 按四种会话各要一项。
-    "search:read.public",
-    "search:read.private",
-    "search:read.im",
-    "search:read.mpim",
 ];
 
-/// 会话发现用的新版搜索要的本人权限（契约 client v29 §2）：四种会话各一项。已在 [`USER_SCOPES`] 里。
+/// 新版搜索要的本人权限（契约 client v29 §2）：四种会话各一项。后台会话发现改由宿主逐会话探测、不再声明
+/// `conversations/recentActivity`，登录也不再申请这几项（不在 [`USER_SCOPES`] 里，缺了不提示重新授权）。
 pub const SEARCH_SCOPES: &[&str] = &[
     "search:read.public",
     "search:read.private",

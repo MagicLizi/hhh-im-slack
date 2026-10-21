@@ -16,6 +16,13 @@ use wiremock::{
 };
 
 const CHANNEL: &str = "C000000099";
+/// 新版搜索要的四项本人权限（插件里的 `SEARCH_SCOPES`）：登录不再申请，授权里本来就有时会话发现的查询照样能用。
+const SEARCH_SCOPES: [&str; 4] = [
+    "search:read.public",
+    "search:read.private",
+    "search:read.im",
+    "search:read.mpim",
+];
 
 /// 假 Slack 对这个方法一律这样回。
 async fn answer(slack: &MockServer, method_name: &str, body: Value) {
@@ -676,11 +683,19 @@ fn hit(channel: &str, ts: &str, user: &str, bot: bool) -> Value {
 
 // 会话发现（契约 client v29 §2）：新版搜索用 `*` 按时间从新到旧列出、四种会话、不含机器人并按 `is_author_bot` 再筛，
 // 翻到没有下一页；按会话归并出最早、最新一条；类别与私聊对方取本机会话列表，列表里没有的按会话读一次资料；
-// 私聊不带资料（名字是对方编号），由宿主读对方本人。
+// 私聊不带资料（名字是对方编号），由宿主读对方本人。插件不再声明这项能力、登录也不再申请新版搜索的权限，
+// 授权里本来就有这几项时照样能用。
 #[tokio::test]
 async fn recent_activity_groups_search_hits_by_conversation_and_skips_bots() {
     let slack = MockServer::start().await;
-    let host = online(&slack).await;
+    let scopes: Vec<&str> = hhh_im_slack::USER_SCOPES
+        .iter()
+        .copied()
+        .chain(SEARCH_SCOPES)
+        .collect();
+    mount_auth_for(&slack, TOKEN, &scopes.join(",")).await;
+    let host = Host::start(options(&slack)).await;
+    host.open(&credential(TOKEN, None, None)).await;
     answer(
         &slack,
         "users.conversations",
@@ -794,15 +809,11 @@ async fn recent_activity_groups_search_hits_by_conversation_and_skips_bots() {
     );
 }
 
-// 授权里缺新版搜索的权限：在本地拒绝，不发搜索请求（宿主据此说明为什么没在发现）。
+// 授权里缺新版搜索的权限：在本地拒绝，不发搜索请求。登录不再申请这几项，缺了也不提示重新登录。
 #[tokio::test]
 async fn recent_activity_without_the_search_scopes_is_refused_before_network() {
     let slack = MockServer::start().await;
-    let (search, granted): (Vec<&str>, Vec<&str>) = hhh_im_slack::USER_SCOPES
-        .iter()
-        .copied()
-        .partition(|s| s.starts_with("search:"));
-    mount_auth_for(&slack, TOKEN, &granted.join(",")).await;
+    mount_auth_for(&slack, TOKEN, &hhh_im_slack::USER_SCOPES.join(",")).await;
     let host = Host::start(options(&slack)).await;
     let open = host
         .ok(
@@ -811,11 +822,10 @@ async fn recent_activity_without_the_search_scopes_is_refused_before_network() {
         )
         .await;
     assert_eq!(open["state"], "online");
-    // 缺的正好是新版搜索那几项：开会话后随问题行报给宿主（内置时由 `missing_scopes()` 给出）。
     assert_eq!(
         host.expect_notification("session/notice").await,
-        json!({ "notices": [{ "id": "missing-scopes", "relogin": true,
-                "text": format!("缺少权限 {}：点重新登录补上授权", search.join("、")) }] })
+        json!({ "notices": [] }),
+        "缺新版搜索的权限不算缺权限"
     );
     let refused = host
         .err(
