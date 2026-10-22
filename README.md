@@ -24,7 +24,7 @@ Slack 的登录，不用重新登录。
 
 ## 构建
 
-构建固定依赖公开 SDK `v0.8.0`，无需本地路径替换。新宿主可在每条读取发出前控制节奏；旧宿主仍使用请求计数兼容路径。
+构建固定依赖公开 SDK `v0.9.0`，无需本地路径替换。新宿主可在每条读取发出前控制节奏，并以交付回执避免通信恢复时集中兑现积压许可；旧宿主保留原许可或请求计数兼容路径。
 
 ```sh
 cargo build --release
@@ -42,7 +42,7 @@ cargo clippy --all-targets
 装自检和打包工具：
 
 ```sh
-cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.8.0 hhh-im-protocol --features transport,package
+cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.9.0 hhh-im-protocol --features transport,package
 ```
 
 打包后自检，全部通过才算改好：

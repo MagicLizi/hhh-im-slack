@@ -200,6 +200,7 @@ impl Plugin for Server {
             | Method::LoginFailed
             | Method::CredentialSave
             | Method::RequestsAcquire
+            | Method::RequestsReceived
             | Method::SessionExpired
             | Method::SessionNotice
             | Method::EventsPush

@@ -29,7 +29,7 @@ use hhh_im_protocol::types::{Conversation, ConversationKind, Outgoing};
 use reqwest::Url;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 use translate::is_slack_id;
 
@@ -286,7 +286,10 @@ impl SlackClient {
     async fn query(&self, method: &str, form: &[(&str, &str)]) -> Result<Value> {
         self.grant.ensure_current()?;
         hhh_im_protocol::runtime::metering::read_request().await?;
-        tracing::debug!(method, "向 Slack 读取平台数据");
+        // 在插件侧记录单调时间，宿主延迟收到日志时仍能核对真实的读取出口间隔。
+        static READ_CLOCK: OnceLock<Instant> = OnceLock::new();
+        let read_started_us = READ_CLOCK.get_or_init(Instant::now).elapsed().as_micros() as u64;
+        tracing::debug!(method, read_started_us, "向 Slack 读取平台数据");
         Ok(self
             .api
             .call(
