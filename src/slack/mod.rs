@@ -216,6 +216,12 @@ impl std::fmt::Debug for SlackClient {
     }
 }
 
+/// 读取出口与响应共用一个进程内单调时钟，日志转发延迟不影响两端配对。
+fn read_clock_us() -> u64 {
+    static READ_CLOCK: OnceLock<Instant> = OnceLock::new();
+    READ_CLOCK.get_or_init(Instant::now).elapsed().as_micros() as u64
+}
+
 impl SlackClient {
     /// 用本人令牌核验身份（`auth.test`）；不接受机器人令牌冒充个人连接。
     pub async fn connect(
@@ -287,16 +293,16 @@ impl SlackClient {
         self.grant.ensure_current()?;
         hhh_im_protocol::runtime::metering::read_request().await?;
         // 在插件侧记录单调时间，宿主延迟收到日志时仍能核对真实的读取出口间隔。
-        static READ_CLOCK: OnceLock<Instant> = OnceLock::new();
-        let read_started_us = READ_CLOCK.get_or_init(Instant::now).elapsed().as_micros() as u64;
+        let read_started_us = read_clock_us();
         tracing::debug!(method, read_started_us, "向 Slack 读取平台数据");
         Ok(self
             .api
-            .call(
+            .call_read(
                 Some(self.grant.access_token()),
                 method,
                 form,
                 Some(api::QUERY_TIMEOUT),
+                read_started_us,
             )
             .await?
             .value)

@@ -84,6 +84,30 @@ impl Api {
         form: &[(&str, &str)],
         timeout: Option<Duration>,
     ) -> Result<Reply> {
+        self.call_observed(token, method, form, timeout, None).await
+    }
+
+    /// 读取请求带回出口时钟；响应同时记录结束时钟，不记录参数或令牌。
+    pub(super) async fn call_read(
+        &self,
+        token: Option<&str>,
+        method: &str,
+        form: &[(&str, &str)],
+        timeout: Option<Duration>,
+        read_started_us: u64,
+    ) -> Result<Reply> {
+        self.call_observed(token, method, form, timeout, Some(read_started_us))
+            .await
+    }
+
+    async fn call_observed(
+        &self,
+        token: Option<&str>,
+        method: &str,
+        form: &[(&str, &str)],
+        timeout: Option<Duration>,
+        read_started_us: Option<u64>,
+    ) -> Result<Reply> {
         let url = self.method_url(method)?;
         let mut request = self.http.post(url).form(form);
         if let Some(token) = token {
@@ -104,6 +128,7 @@ impl Api {
             .and_then(|value| value.to_str().ok())
             .map(str::to_owned);
         let reply = read_reply(response).await;
+        let read_finished_us = read_started_us.map(|_| super::read_clock_us());
         // 只记接口与平台退避，便于区分本机请求节奏和平台额度；不记参数、令牌或响应正文。
         tracing::debug!(
             method,
@@ -111,6 +136,8 @@ impl Api {
             retry_after_secs = ?reply.as_ref().err().and_then(|error| error.retry_after_secs),
             ?request_id,
             elapsed_ms = started.elapsed().as_millis() as u64,
+            ?read_started_us,
+            ?read_finished_us,
             "Slack 平台请求已返回"
         );
         reply
