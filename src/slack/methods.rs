@@ -53,6 +53,13 @@ const REACTIONS_TIP: &str = "要显示其他人点的表情，需要 reactions:r
 /// 声明给宿主的表情编号写法（同 [`super::mrkdwn::is_emoji_name`]：不以冒号开头或结尾，不含空白与 `_-+':` 以外的
 /// ASCII 标点；字母数字含各种文字）。宿主另有泛化校验（非空、64 字节以内、无控制字符）。
 pub const EMOJI_NAME_PATTERN: &str = r##"^(?:[^\s:!"#$%&()*,./;<=>?@\[\\\]^`{|}~]|[^\s:!"#$%&()*,./;<=>?@\[\\\]^`{|}~][^\s!"#$%&()*,./;<=>?@\[\\\]^`{|}~]*[^\s:!"#$%&()*,./;<=>?@\[\\\]^`{|}~])$"##;
+/// 表情写进文字的写法（HHH 契约 provider-protocol v31）：Slack 的文字里表情写成 `:名字:`，肤色版本 `:wave::skin-tone-3:`。
+/// 2026-10-22 取样：从 HHH 发 `:smile: :wave::skin-tone-3: :++: :+1:` 与紧贴中文的 `好的:+1:收到:tada:ok:smile:`，
+/// Slack 客户端里都显示成表情（含自定义表情）。
+pub const EMOJI_TEXT_TEMPLATE: &str = ":{type}:";
+/// 正文里的表情写法（同 [`EMOJI_TEXT_TEMPLATE`]）：第一个括号是表情编号（含肤色后缀）。插件读消息时已把 `:名字:` 翻成表情节点，
+/// 这一项给宿主认还没读回来的文字（如刚发出、本机先显示的那条）。
+pub const EMOJI_TEXT_PATTERN: &str = r":([^:\s]+(?:::skin-tone-[2-6])?):";
 /// 声明给宿主的头像身份（同 [`avatar_identity`]）：Slack 头像 CDN（`*.slack-edge.com`）上的是路径去掉扩展名与末尾的
 /// `_72`、`-72` 这类尺寸；Gravatar 上的是最后一段去掉扩展名。
 pub const AVATAR_KEY_PATTERN: &str = r"^(?i:https)://(?:[^/?#]*\.(?i:slack-edge\.com)(?::[0-9]*)?/|(?i:secure\.gravatar\.com)(?::[0-9]*)?/(?:[^/?#]*/)*)([^?#]*?)(?:[_-][0-9]+)?(?:\.[^./?#]*)?(?:[?#]|$)";

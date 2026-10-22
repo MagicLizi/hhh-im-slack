@@ -20,7 +20,20 @@ mod rich;
 pub(crate) mod translate;
 
 pub use auth::{LoginRequest, SlackAuth, SlackLogin, SlackPendingLogin, missing_scopes};
-pub use methods::{AVATAR_KEY_PATTERN, AVATAR_VARIANT_PATTERN, EMOJI_NAME_PATTERN};
+pub(crate) use emoji::catalog_json;
+
+/// 标准表情目录里每个表情的编号（含肤色版本），测试核对写法用。
+#[cfg(test)]
+pub(crate) fn standard_catalog_for_tests() -> Vec<String> {
+    emoji::catalog()
+        .into_iter()
+        .map(|item| item.emoji.emoji_type)
+        .collect()
+}
+pub use methods::{
+    AVATAR_KEY_PATTERN, AVATAR_VARIANT_PATTERN, EMOJI_NAME_PATTERN, EMOJI_TEXT_PATTERN,
+    EMOJI_TEXT_TEMPLATE,
+};
 pub use translate::SlackMessage;
 
 use crate::{AuthGrant, Error, ErrorKind, Result};

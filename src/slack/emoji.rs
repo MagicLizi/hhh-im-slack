@@ -75,17 +75,18 @@ fn primary_of(entry: &'static Entry) -> Option<&'static Entry> {
 /// 肤色后缀 `::skin-tone-2` 到 `::skin-tone-6` 的叫法（界面的 `tone`）。
 const TONES: [&str; 5] = ["浅色", "中浅色", "中等色", "中深色", "深色"];
 
-/// Slack 面板的分类与顺序（笑脸与人物合成一类，自定义表情在最后）。
-const CATEGORIES: [(&str, &str); 9] = [
-    ("smileys", "笑脸与人物"),
-    ("nature", "动物与自然"),
-    ("food", "食物与饮料"),
-    ("travel", "旅行与地点"),
-    ("activities", "活动"),
-    ("objects", "物品"),
-    ("symbols", "符号"),
-    ("flags", "旗帜"),
-    (CUSTOM, "自定义"),
+/// Slack 面板的分类与顺序（笑脸与人物合成一类，自定义表情在最后）：编号、中文名，以及分类标签画 HHH 图标库里的哪个图标
+/// （HHH 契约 provider-protocol v31 的 `icon`，取 HHH 图标库的名字；分类编号本身不决定图标）。
+const CATEGORIES: [(&str, &str, &str); 9] = [
+    ("smileys", "笑脸与人物", "smileys"),
+    ("nature", "动物与自然", "nature"),
+    ("food", "食物与饮料", "food"),
+    ("travel", "旅行与地点", "travel"),
+    ("activities", "活动", "activities"),
+    ("objects", "物品", "objects"),
+    ("symbols", "符号", "symbols"),
+    ("flags", "旗帜", "flags"),
+    (CUSTOM, "自定义", "custom"),
 ];
 
 /// 自定义表情的分类编号。
@@ -123,11 +124,41 @@ impl CatalogItem {
 pub(crate) fn categories() -> Vec<EmojiCategory> {
     CATEGORIES
         .iter()
-        .map(|(id, name)| EmojiCategory {
+        .map(|(id, name, _)| EmojiCategory {
             id: (*id).into(),
             name: (*name).into(),
         })
         .collect()
+}
+
+/// `emoji/catalog` 的 JSON：每个分类带上它的图标（见 [`category_icon`]）。
+pub(crate) fn catalog_json(
+    catalog: &hhh_im_protocol::method::EmojiCatalogResult,
+) -> serde_json::Value {
+    let mut value = serde_json::to_value(catalog).expect("表情目录总能写成 JSON");
+    if let Some(categories) = value
+        .get_mut("categories")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        for category in categories {
+            let icon = category
+                .get("id")
+                .and_then(serde_json::Value::as_str)
+                .and_then(category_icon);
+            if let Some(icon) = icon {
+                category["icon"] = serde_json::Value::from(icon);
+            }
+        }
+    }
+    value
+}
+
+/// 分类的图标（见 [`CATEGORIES`]）；不在面板分类里的没有。
+pub(crate) fn category_icon(id: &str) -> Option<&'static str> {
+    CATEGORIES
+        .iter()
+        .find(|(own, _, _)| *own == id)
+        .map(|(_, _, icon)| *icon)
 }
 
 /// 目录的肤色：编号就是名字后缀 `skin-tone-2` 到 `-6`。
@@ -171,7 +202,7 @@ pub(crate) fn catalog() -> Vec<CatalogItem> {
     let rank = |category: &str| {
         CATEGORIES
             .iter()
-            .position(|(id, _)| *id == category)
+            .position(|(id, _, _)| *id == category)
             .unwrap_or(CATEGORIES.len())
     };
     let mut primaries: Vec<&Entry> = table.iter().filter(|e| e.primary.is_empty()).collect();
@@ -277,6 +308,37 @@ pub(crate) fn standard(name: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// HHH 契约 provider-protocol v31：每个分类都给了图标，图标都在 HHH 的图标库里（hhh-im-protocol 的 `EMOJI_CATEGORY_ICONS`），
+    /// 分类编号与图标分开写；目录 JSON 的其余部分不变。
+    #[test]
+    fn every_category_names_an_icon_from_the_host_library() {
+        const HOST_ICONS: [&str; 9] = [
+            "smileys",
+            "nature",
+            "food",
+            "travel",
+            "activities",
+            "objects",
+            "symbols",
+            "flags",
+            "custom",
+        ];
+        let catalog = hhh_im_protocol::method::EmojiCatalogResult {
+            emojis: Vec::new(),
+            categories: categories(),
+            tones: tones(),
+            updated_at_ms: 0,
+        };
+        let json = catalog_json(&catalog);
+        let categories = json["categories"].as_array().unwrap();
+        assert_eq!(categories.len(), CATEGORIES.len());
+        for category in categories {
+            let icon = category["icon"].as_str().expect("每个分类都有图标");
+            assert!(HOST_ICONS.contains(&icon), "{icon}");
+        }
+        assert_eq!(json["tones"], serde_json::to_value(tones()).unwrap());
+    }
 
     #[test]
     fn table_is_sorted_for_binary_search_and_not_empty() {

@@ -19,7 +19,7 @@ mod slack;
 pub use error::{Error, ErrorKind, ReauthReason, Result};
 pub use grant::AuthGrant;
 pub use slack::{
-    AVATAR_KEY_PATTERN, AVATAR_VARIANT_PATTERN, Caches, EMOJI_NAME_PATTERN, LoginRequest,
-    SlackAccount, SlackAuth, SlackClient, SlackConfig, SlackLogin, SlackPendingLogin, USER_SCOPES,
-    missing_scopes,
+    AVATAR_KEY_PATTERN, AVATAR_VARIANT_PATTERN, Caches, EMOJI_NAME_PATTERN, EMOJI_TEXT_PATTERN,
+    EMOJI_TEXT_TEMPLATE, LoginRequest, SlackAccount, SlackAuth, SlackClient, SlackConfig,
+    SlackLogin, SlackPendingLogin, USER_SCOPES, missing_scopes,
 };
