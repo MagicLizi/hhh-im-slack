@@ -72,6 +72,21 @@ impl From<Error> for RpcError {
     }
 }
 
+impl From<RpcError> for Error {
+    fn from(error: RpcError) -> Self {
+        match error.data {
+            Some(data) => Self {
+                kind: data.kind,
+                message: data.user_message.unwrap_or(error.message),
+                platform_code: data.platform_code,
+                reauth: data.reauth,
+                retry_after_secs: data.retry_after_secs,
+            },
+            None => Self::new(ErrorKind::ProtocolError, error.message),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

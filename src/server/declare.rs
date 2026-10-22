@@ -65,9 +65,9 @@ pub(crate) fn platform() -> PlatformDesc {
         }),
         // 历史与话题一页最多 200 条（契约 client v11 §3.3）。
         page_max: Some(u32::from(HISTORY_PAGE_MAX)),
-        // 读历史与话题是 Slack 的第 3 档限速（每个工作区每分钟 50 次以上），合计留出余量（契约 client v11 §3.12）。
+        // 每分钟留出余量；逐会话发现会连续读，按 Slack 建议每秒至多一次，避免依赖突发额度。
         reads: Some(RateBudget {
-            per_second: 5,
+            per_second: 1,
             per_minute: 40,
         }),
         // 每个文件先查一次文件资料（第 4 档，每分钟 100 次以上），再下载。
@@ -134,6 +134,8 @@ pub(crate) fn platform() -> PlatformDesc {
         // 编辑过的消息 Slack 每次都带着 `edited`（契约 client v11 §3.6），不用按内容比较。
         edits_by_content: Vec::new(),
         retranslate_rules: Vec::new(),
+        content_repairs: Vec::new(),
+        content_rereads: Vec::new(),
     }
 }
 
@@ -180,6 +182,7 @@ pub(crate) fn capabilities() -> Capabilities {
         },
         events: Default::default(),
         retranslate: false,
+        message_maintenance: false,
         session: SessionCaps { renew: true },
     }
 }
@@ -229,6 +232,7 @@ pub fn result() -> Value {
         },
         platform: platform(),
         capabilities: capabilities(),
+        read_request_gating: true,
         settings: Vec::new(),
         login_methods: login_methods(),
         actions: Vec::new(),
@@ -249,6 +253,8 @@ mod tests {
         assert_eq!(value["provider"]["id"], "slack");
         assert_eq!(value["capabilities"]["people"]["bots"], true);
         assert_eq!(value["capabilities"]["people"]["batchMax"], 2000);
+        assert_eq!(value["platform"]["reads"]["perSecond"], 1);
+        assert_eq!(value["platform"]["reads"]["perMinute"], 40);
         // 只有「通过中继登录」一种，预填 HHH 的中继（https）；文字在宿主的预算内。
         let methods = value["loginMethods"].as_array().unwrap();
         assert_eq!(methods.len(), 1);

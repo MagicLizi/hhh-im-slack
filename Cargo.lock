@@ -439,8 +439,8 @@ checksum = "e17592d60ebacc7d5e169f4663c5f84f9161cc90328abcfe8456f41e4dfcb284"
 
 [[package]]
 name = "hhh-im-protocol"
-version = "0.4.0"
-source = "git+https://github.com/MagicLizi/hhh-im-sdk?tag=v0.4.0#1763829b35786dffb85661049ae3caab801c96e4"
+version = "0.8.0"
+source = "git+https://github.com/MagicLizi/hhh-im-sdk?tag=v0.8.0#a99a0904976445f1d385a30dfde1fbf71a2e19d5"
 dependencies = [
  "base64 0.22.1",
  "regex-lite",
@@ -450,6 +450,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "wasip2",
 ]
 
 [[package]]
@@ -1600,6 +1601,9 @@ name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
+dependencies = [
+ "bitflags",
+]
 
 [[package]]
 name = "writeable"

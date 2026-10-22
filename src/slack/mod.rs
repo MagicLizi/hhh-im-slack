@@ -285,7 +285,8 @@ impl SlackClient {
     /// 读：带本人令牌、10 秒超时，算一次平台请求（宿主按它记读取额度）。
     async fn query(&self, method: &str, form: &[(&str, &str)]) -> Result<Value> {
         self.grant.ensure_current()?;
-        hhh_im_protocol::runtime::metering::request();
+        hhh_im_protocol::runtime::metering::read_request().await?;
+        tracing::debug!(method, "向 Slack 读取平台数据");
         Ok(self
             .api
             .call(

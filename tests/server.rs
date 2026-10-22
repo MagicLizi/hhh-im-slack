@@ -17,6 +17,84 @@ use wiremock::{Mock, MockServer, Request, Respond, ResponseTemplate};
 /// HHH 的 Slack 应用（新登录与它发出的授权续期都用它）。
 const BUILTIN_CLIENT_ID: &str = "2372848536.12176806034562";
 
+/// 宿主只放行一条时，真正的 HTTP 服务也只收到一条；拒绝后没有第二条请求。
+#[tokio::test]
+async fn platform_http_waits_for_each_host_grant_and_stops_when_cancelled() {
+    let slack = MockServer::start().await;
+    let host = online(&slack).await;
+    Mock::given(method("POST"))
+        .and(path("/api/bots.info"))
+        .respond_with(|request: &Request| {
+            ResponseTemplate::new(200).set_body_json(json!({
+                "ok":true, "bot":{"id":form(request)["bot"], "name":"测试机器人"}
+            }))
+        })
+        .mount(&slack)
+        .await;
+    let caller = host.conn.clone();
+    let reading =
+        tokio::spawn(async move {
+            caller.call("people/get", json!({
+        "ids":[], "bots":["B000000001","B000000002"], "_meta":{"readPermit":"read-1"}
+    })).await
+        });
+    let Incoming::Request { id, method, params } = host.next().await else {
+        panic!("先申请额度")
+    };
+    assert_eq!(method, "requests/acquire");
+    assert_eq!(params["permit"], "read-1");
+    assert_eq!(
+        slack
+            .received_requests()
+            .await
+            .unwrap()
+            .iter()
+            .filter(|r| r.url.path() == "/api/bots.info")
+            .count(),
+        0
+    );
+    host.conn
+        .respond(id, json!({"granted":true}))
+        .await
+        .unwrap();
+    let Incoming::Request { id, method, .. } = host.next().await else {
+        panic!("第二条还要等额度")
+    };
+    assert_eq!(method, "requests/acquire");
+    assert_eq!(
+        slack
+            .received_requests()
+            .await
+            .unwrap()
+            .iter()
+            .filter(|r| r.url.path() == "/api/bots.info")
+            .count(),
+        1
+    );
+    host.conn
+        .respond_err(
+            id,
+            hhh_im_protocol::rpc::RpcError::from_kind(
+                hhh_im_protocol::ErrorKind::Cancelled,
+                "已停止读取",
+            ),
+        )
+        .await
+        .unwrap();
+    let error = reading.await.unwrap().unwrap_err();
+    assert_eq!(kind_of(&error), hhh_im_protocol::ErrorKind::Cancelled);
+    assert_eq!(
+        slack
+            .received_requests()
+            .await
+            .unwrap()
+            .iter()
+            .filter(|r| r.url.path() == "/api/bots.info")
+            .count(),
+        1
+    );
+}
+
 /// 握手结果与样例逐项相同（样例拷进 HHH，宿主那边核对平台说明与内置 Slack 一致）；说不出 v1 的宿主被拒绝。
 #[tokio::test]
 async fn initialize_declares_the_builtin_slack_platform() {

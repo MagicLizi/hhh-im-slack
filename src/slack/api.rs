@@ -8,7 +8,7 @@ use super::errors;
 use crate::{Error, ErrorKind, Result};
 use reqwest::{Response, Url};
 use serde_json::Value;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// JSON 响应的解压后上限，避免历史或异常响应无界读入。与飞书同一预算。
 pub const RESPONSE_MAX_BYTES: usize = 4 * 1024 * 1024;
@@ -92,11 +92,28 @@ impl Api {
         if let Some(timeout) = timeout {
             request = request.timeout(timeout);
         }
+        let started = Instant::now();
         let response = request
             .send()
             .await
             .map_err(|error| Error::network(error, "无法连接 Slack。"))?;
-        read_reply(response).await
+        let status = response.status().as_u16();
+        let request_id = response
+            .headers()
+            .get("x-slack-req-id")
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_owned);
+        let reply = read_reply(response).await;
+        // 只记接口与平台退避，便于区分本机请求节奏和平台额度；不记参数、令牌或响应正文。
+        tracing::debug!(
+            method,
+            status,
+            retry_after_secs = ?reply.as_ref().err().and_then(|error| error.retry_after_secs),
+            ?request_id,
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "Slack 平台请求已返回"
+        );
+        reply
     }
 
     /// 本调用层的 HTTP 客户端；上传文件内容时向 Slack 给的上传地址直接发字节。
