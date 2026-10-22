@@ -216,12 +216,13 @@ impl Server {
         Ok(to_value(page))
     }
 
-    /// `emoji/catalog`。
+    /// `emoji/catalog`。分类带上图标（HHH 契约 provider-protocol v31 的 `icon`，可选字段）：本插件锁的协议包还没有这个字段，
+    /// 直接写进 JSON，升级协议包时换成 `EmojiCategory::icon`。
     pub(crate) async fn emoji_catalog(&self) -> Result<Value, RpcError> {
         let catalog = self
             .with_client(|client| async move { client.emoji_catalog().await })
             .await?;
-        Ok(to_value(catalog))
+        Ok(crate::slack::catalog_json(&catalog))
     }
 
     /// `emoji/image`：表情图很小（≤512 KB），整份读下来交出要的那一段。

@@ -18,7 +18,10 @@ use serde_json::Value;
 use super::login;
 use super::relay::DEFAULT_RELAY;
 use crate::slack::{HISTORY_PAGE_MAX, UPLOAD_MAX_BYTES, methods::PEOPLE_BATCH_MAX};
-use crate::{AVATAR_KEY_PATTERN, AVATAR_VARIANT_PATTERN, EMOJI_NAME_PATTERN, ErrorKind};
+use crate::{
+    AVATAR_KEY_PATTERN, AVATAR_VARIANT_PATTERN, EMOJI_NAME_PATTERN, EMOJI_TEXT_PATTERN,
+    EMOJI_TEXT_TEMPLATE, ErrorKind,
+};
 
 /// 插件编号（同清单 `id`）。
 pub(crate) const PROVIDER_ID: &str = "slack";
@@ -117,8 +120,9 @@ pub(crate) fn platform() -> PlatformDesc {
                 guess: false,
                 guess_pattern: None,
             },
-            // 正文里的 `:name:` 在翻译时已换成表情节点，界面不再按文字找；Slack 的表情图不是白底。
-            text_pattern: None,
+            // 正文里的 `:name:`：读回来的在翻译时已换成表情节点；还没读回来的文字（刚发出、本机先显示的）宿主按它认。
+            // Slack 的表情图不是白底。
+            text_pattern: Some(EMOJI_TEXT_PATTERN.into()),
             white_background: false,
         }),
         // 新版搜索 `assistant.search.context`（契约 client v29，2026-10-04 取样）：每页 20 条、发出后 15–30 秒收录；
@@ -219,7 +223,7 @@ pub(crate) fn initialize(params: pm::InitializeParams) -> Result<Value, RpcError
 
 /// `initialize` 的结果（不看宿主参数的那部分）。
 pub fn result() -> Value {
-    serde_json::to_value(pm::InitializeResult {
+    let mut result = serde_json::to_value(pm::InitializeResult {
         protocol_version: hhh_im_protocol::PROTOCOL_VERSION,
         provider: pm::ProviderInfo {
             id: PROVIDER_ID.into(),
@@ -232,12 +236,39 @@ pub fn result() -> Value {
         login_methods: login_methods(),
         actions: Vec::new(),
     })
-    .expect("握手结果总能写成 JSON")
+    .expect("握手结果总能写成 JSON");
+    // 表情写进文字的写法（协议 v31，可选字段）：本插件锁的协议包还没有这个字段，直接写进平台说明的 JSON；升级协议包时换成
+    // `EmojiRules::text_template`。
+    result["platform"]["emoji"]["textTemplate"] = Value::from(EMOJI_TEXT_TEMPLATE);
+    result
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// HHH 契约 provider-protocol v31：写进文字的写法与正文写法对得上——标准目录里每个表情（含肤色版本）按写法写出来，
+    /// 正文写法整段认出、认出的就是它的编号（HHH 的自检工具 hhh-im-check 也这样查）；紧贴中文时也一个个认得出。
+    #[test]
+    fn the_text_template_round_trips_through_the_text_pattern() {
+        let declared = result();
+        let emoji = &declared["platform"]["emoji"];
+        assert_eq!(emoji["textTemplate"], ":{type}:");
+        let pattern = regex_lite::Regex::new(emoji["textPattern"].as_str().unwrap()).unwrap();
+        let mut checked = 0;
+        for item in crate::slack::standard_catalog_for_tests() {
+            let text = EMOJI_TEXT_TEMPLATE.replace("{type}", &item);
+            let found = pattern.captures(&text).expect("认得出");
+            assert_eq!((&found[0], &found[1]), (text.as_str(), item.as_str()));
+            checked += 1;
+        }
+        assert!(checked > 3000, "标准目录与肤色版本都查了：{checked}");
+        let found: Vec<&str> = pattern
+            .captures_iter("好的:+1:收到:tada:ok:smile: :wave::skin-tone-3::++:")
+            .map(|c| c.get(1).unwrap().as_str())
+            .collect();
+        assert_eq!(found, ["+1", "tada", "smile", "wave::skin-tone-3", "++"]);
+    }
 
     #[test]
     fn the_declaration_is_consistent() {
