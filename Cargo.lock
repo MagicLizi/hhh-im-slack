@@ -243,7 +243,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -439,8 +439,8 @@ checksum = "e17592d60ebacc7d5e169f4663c5f84f9161cc90328abcfe8456f41e4dfcb284"
 
 [[package]]
 name = "hhh-im-protocol"
-version = "0.4.0"
-source = "git+https://github.com/MagicLizi/hhh-im-sdk?tag=v0.4.0#1763829b35786dffb85661049ae3caab801c96e4"
+version = "0.9.0"
+source = "git+https://github.com/MagicLizi/hhh-im-sdk?tag=v0.9.0#dd0dbd5a61780ffd50db761437bc731f966ffaea"
 dependencies = [
  "base64 0.22.1",
  "regex-lite",
@@ -450,11 +450,12 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "wasip2",
 ]
 
 [[package]]
 name = "hhh-im-slack"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "base64 0.22.1",
  "getrandom 0.3.4",
@@ -1600,6 +1601,9 @@ name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
+dependencies = [
+ "bitflags",
+]
 
 [[package]]
 name = "writeable"

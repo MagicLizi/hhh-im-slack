@@ -1,6 +1,6 @@
 [package]
 name = "hhh-im-slack"
-version = "1.0.4"
+version = "1.0.5"
 edition = "2024"
 publish = false
 license = "MIT"
@@ -18,7 +18,7 @@ path = "src/main.rs"
 
 [dependencies]
 # 协议包：线上类型、格式正文与卡片的类型、插件运行时（协议服务、日志、资源分段、上传、请求计数；按标签取一个固定版本）。
-hhh-im-protocol = { git = "https://github.com/MagicLizi/hhh-im-sdk", tag = "v0.4.0", features = ["runtime"] }
+hhh-im-protocol = { git = "https://github.com/MagicLizi/hhh-im-sdk", tag = "v0.9.0", features = ["runtime"] }
 # serde：序列化框架；derive = 在类型上一行 #[derive(Serialize, Deserialize)] 自动生成编解码。
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -46,7 +46,7 @@ tokio = { version = "1", default-features = false, features = ["macros", "rt-mul
 # wiremock：测试用的本机假 Slack 与假授权中继，验证请求形状与错误分级。
 wiremock = "0.6"
 # 测试里用宿主那一侧的连接层（transport）当宿主，跟插件按协议说话。
-hhh-im-protocol = { git = "https://github.com/MagicLizi/hhh-im-sdk", tag = "v0.4.0", features = ["runtime", "transport"] }
+hhh-im-protocol = { git = "https://github.com/MagicLizi/hhh-im-sdk", tag = "v0.9.0", features = ["runtime", "transport"] }
 # regex-lite：宿主认头像身份、表情编号用的正则库，测试里拿它核对声明的写法与内置的认法一致。
 regex-lite = "0.1"
 

@@ -8,7 +8,7 @@ use super::errors;
 use crate::{Error, ErrorKind, Result};
 use reqwest::{Response, Url};
 use serde_json::Value;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// JSON 响应的解压后上限，避免历史或异常响应无界读入。与飞书同一预算。
 pub const RESPONSE_MAX_BYTES: usize = 4 * 1024 * 1024;
@@ -84,6 +84,30 @@ impl Api {
         form: &[(&str, &str)],
         timeout: Option<Duration>,
     ) -> Result<Reply> {
+        self.call_observed(token, method, form, timeout, None).await
+    }
+
+    /// 读取请求带回出口时钟；响应同时记录结束时钟，不记录参数或令牌。
+    pub(super) async fn call_read(
+        &self,
+        token: Option<&str>,
+        method: &str,
+        form: &[(&str, &str)],
+        timeout: Option<Duration>,
+        read_started_us: u64,
+    ) -> Result<Reply> {
+        self.call_observed(token, method, form, timeout, Some(read_started_us))
+            .await
+    }
+
+    async fn call_observed(
+        &self,
+        token: Option<&str>,
+        method: &str,
+        form: &[(&str, &str)],
+        timeout: Option<Duration>,
+        read_started_us: Option<u64>,
+    ) -> Result<Reply> {
         let url = self.method_url(method)?;
         let mut request = self.http.post(url).form(form);
         if let Some(token) = token {
@@ -92,11 +116,31 @@ impl Api {
         if let Some(timeout) = timeout {
             request = request.timeout(timeout);
         }
+        let started = Instant::now();
         let response = request
             .send()
             .await
             .map_err(|error| Error::network(error, "无法连接 Slack。"))?;
-        read_reply(response).await
+        let status = response.status().as_u16();
+        let request_id = response
+            .headers()
+            .get("x-slack-req-id")
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_owned);
+        let reply = read_reply(response).await;
+        let read_finished_us = read_started_us.map(|_| super::read_clock_us());
+        // 只记接口与平台退避，便于区分本机请求节奏和平台额度；不记参数、令牌或响应正文。
+        tracing::debug!(
+            method,
+            status,
+            retry_after_secs = ?reply.as_ref().err().and_then(|error| error.retry_after_secs),
+            ?request_id,
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            ?read_started_us,
+            ?read_finished_us,
+            "Slack 平台请求已返回"
+        );
+        reply
     }
 
     /// 本调用层的 HTTP 客户端；上传文件内容时向 Slack 给的上传地址直接发字节。

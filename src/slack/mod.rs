@@ -42,7 +42,7 @@ use hhh_im_protocol::types::{Conversation, ConversationKind, Outgoing};
 use reqwest::Url;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 use translate::is_slack_id;
 
@@ -66,14 +66,10 @@ pub const USER_SCOPES: &[&str] = &[
     "emoji:read",
     "team:read",
     "usergroups:read",
-    // 会话发现（契约 client v29 §2）：新版搜索 `assistant.search.context` 按四种会话各要一项。
-    "search:read.public",
-    "search:read.private",
-    "search:read.im",
-    "search:read.mpim",
 ];
 
-/// 会话发现用的新版搜索要的本人权限（契约 client v29 §2）：四种会话各一项。已在 [`USER_SCOPES`] 里。
+/// 新版搜索要的本人权限（契约 client v29 §2）：四种会话各一项。后台会话发现改由宿主逐会话探测、不再声明
+/// `conversations/recentActivity`，登录也不再申请这几项（不在 [`USER_SCOPES`] 里，缺了不提示重新授权）。
 pub const SEARCH_SCOPES: &[&str] = &[
     "search:read.public",
     "search:read.private",
@@ -233,6 +229,12 @@ impl std::fmt::Debug for SlackClient {
     }
 }
 
+/// 读取出口与响应共用一个进程内单调时钟，日志转发延迟不影响两端配对。
+fn read_clock_us() -> u64 {
+    static READ_CLOCK: OnceLock<Instant> = OnceLock::new();
+    READ_CLOCK.get_or_init(Instant::now).elapsed().as_micros() as u64
+}
+
 impl SlackClient {
     /// 用本人令牌核验身份（`auth.test`）；不接受机器人令牌冒充个人连接。
     pub async fn connect(
@@ -302,14 +304,18 @@ impl SlackClient {
     /// 读：带本人令牌、10 秒超时，算一次平台请求（宿主按它记读取额度）。
     async fn query(&self, method: &str, form: &[(&str, &str)]) -> Result<Value> {
         self.grant.ensure_current()?;
-        hhh_im_protocol::runtime::metering::request();
+        hhh_im_protocol::runtime::metering::read_request().await?;
+        // 在插件侧记录单调时间，宿主延迟收到日志时仍能核对真实的读取出口间隔。
+        let read_started_us = read_clock_us();
+        tracing::debug!(method, read_started_us, "向 Slack 读取平台数据");
         Ok(self
             .api
-            .call(
+            .call_read(
                 Some(self.grant.access_token()),
                 method,
                 form,
                 Some(api::QUERY_TIMEOUT),
+                read_started_us,
             )
             .await?
             .value)

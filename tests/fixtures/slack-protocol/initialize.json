@@ -4,7 +4,6 @@
       "findDirect": true,
       "list": true,
       "members": true,
-      "recentActivity": true,
       "search": true
     },
     "edit": true,
@@ -96,8 +95,6 @@
     },
     "emoji": {
       "namePattern": "^(?:[^\\s:!\"#$%&()*,./;<=>?@\\[\\\\\\]^`{|}~]|[^\\s:!\"#$%&()*,./;<=>?@\\[\\\\\\]^`{|}~][^\\s!\"#$%&()*,./;<=>?@\\[\\\\\\]^`{|}~]*[^\\s:!\"#$%&()*,./;<=>?@\\[\\\\\\]^`{|}~])$",
-      "textPattern": ":([^:\\s]+(?:::skin-tone-[2-6])?):",
-      "textTemplate": ":{type}:",
       "unlisted": {
         "placeholderLabel": ""
       }
@@ -125,7 +122,7 @@
     },
     "reads": {
       "perMinute": 40,
-      "perSecond": 5
+      "perSecond": 1
     },
     "threads": {
       "activityOnRoot": true,
@@ -143,7 +140,8 @@
   "provider": {
     "id": "slack",
     "name": "Slack",
-    "version": "1.0.4"
+    "version": "1.0.5"
   },
+  "readRequestGating": true,
   "settings": []
 }

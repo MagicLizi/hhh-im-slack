@@ -21,14 +21,14 @@
 ## 每个插件都要的那一半，用运行时
 
 协议服务（并发处理、`$/cancel`、等宿主回话）、日志转 `log/write`、资源分段、上传攒齐与核对、平台请求计数都用协议包的插件运行时
-（`hhh_im_protocol::runtime`），这里不另写一份。向 Slack 发读取请求的出口（`SlackClient::query`）每次调一下 `metering::request()`。
+（`hhh_im_protocol::runtime`），这里不另写一份。握手声明 `readRequestGating`，向 Slack 发读取请求的出口（`SlackClient::query`）每次先等待 `metering::read_request().await?`，获准后才发 HTTP；旧宿主没给读取凭据时自动退回计数模式。
 
 ## 第一原则：体验和内置 Slack 一样
 
 用户从内置 Slack 换成这个插件时，界面、说明文字、登录、续期和本机记录都不能有区别：
 
 - 翻译规则原样搬自内置 Slack，只是输出直接是协议的类型。线上消息经 HHH 宿主翻回来，要与内置 Slack 翻同一份原始数据一字不差：
-  `src/slack/goldens.rs` 锁住插件的输出，HHH 的 `hhh-im/src/provider/slack_parity_tests.rs` 用宿主真正的翻译核对。
+  `src/slack/goldens.rs` 锁住插件的输出，HHH 的 `hhh-im/src/provider/parity_tests.rs` 用宿主真正的翻译核对。
 - 握手声明（`declare.rs`）照内置 Slack 的平台表逐项写，HHH 那边逐项对照。
 - 编号种类（`idType`，如 `user_id`）、头像键（Slack 给的完整地址）都照内置时的写法，本机的旧记录才认得出是同一个人、同一个头像。
 - 续期和失效的说法和 Friend 内置时一样，分两处写（`session.rs` 的 `error_text`、`card_text`）：
@@ -67,7 +67,7 @@
 
 1. `cargo build --release`、`cargo test`、`cargo fmt --check`、`cargo clippy --all-targets` 全部通过（零警告）。
 2. 打包后自检：`powershell -File scripts/pack.ps1`，再跑 `hhh-im-check dist/stage/hhh-im-provider.json`，全部通过。
-   自检工具没装时：`cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.4.0 hhh-im-protocol --features transport,package`。
+   自检工具没装时：`cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.9.0 hhh-im-protocol --features transport,package`。
 3. 在 HHH 里试一遍：设置 → IM → 添加 IM → 文件夹，选 `dist/stage`。登录、读、发、续期都走一遍。
 
 ## 清单 `hhh-im-provider.json`
