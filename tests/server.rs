@@ -173,7 +173,10 @@ async fn initialize_declares_the_builtin_slack_platform() {
     }
     let expected: Value = serde_json::from_slice(&std::fs::read(&golden).unwrap()).unwrap();
     assert_eq!(result, expected);
-    assert_eq!(result, hhh_im_slack::server::initialize_result());
+    // 宿主看到的握手比插件自己写的多一项 `perf`：SDK 运行时替插件声明性能自报（协议 v32）。
+    let mut own = hhh_im_slack::server::initialize_result();
+    own["capabilities"]["perf"] = Value::Bool(true);
+    assert_eq!(result, own);
     let parsed: hhh_im_protocol::method::InitializeResult =
         serde_json::from_value(result.clone()).unwrap();
     parsed

@@ -24,6 +24,7 @@
       "get": true,
       "search": true
     },
+    "perf": true,
     "reactions": {
       "add": true,
       "catalog": true,
@@ -95,6 +96,8 @@
     },
     "emoji": {
       "namePattern": "^(?:[^\\s:!\"#$%&()*,./;<=>?@\\[\\\\\\]^`{|}~]|[^\\s:!\"#$%&()*,./;<=>?@\\[\\\\\\]^`{|}~][^\\s!\"#$%&()*,./;<=>?@\\[\\\\\\]^`{|}~]*[^\\s:!\"#$%&()*,./;<=>?@\\[\\\\\\]^`{|}~])$",
+      "textPattern": ":([^:\\s]+(?:::skin-tone-[2-6])?):",
+      "textTemplate": ":{type}:",
       "unlisted": {
         "placeholderLabel": ""
       }

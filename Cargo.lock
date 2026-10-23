@@ -243,7 +243,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -439,8 +439,8 @@ checksum = "e17592d60ebacc7d5e169f4663c5f84f9161cc90328abcfe8456f41e4dfcb284"
 
 [[package]]
 name = "hhh-im-protocol"
-version = "0.9.0"
-source = "git+https://github.com/MagicLizi/hhh-im-sdk?tag=v0.9.0#dd0dbd5a61780ffd50db761437bc731f966ffaea"
+version = "0.10.0"
+source = "git+https://github.com/MagicLizi/hhh-im-sdk?tag=v0.10.0#8595a48c339a19859df224502f43690f777f526c"
 dependencies = [
  "base64 0.22.1",
  "regex-lite",

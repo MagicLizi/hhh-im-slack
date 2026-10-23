@@ -124,6 +124,8 @@ pub(crate) fn platform() -> PlatformDesc {
             // Slack 的表情图不是白底。
             text_pattern: Some(EMOJI_TEXT_PATTERN.into()),
             white_background: false,
+            // 表情写进文字的写法（协议 v31）：宿主据此给输入框的表情按钮。
+            text_template: Some(EMOJI_TEXT_TEMPLATE.into()),
         }),
         // 不声明账号级 `recentActivity`：新版搜索官方只许响应用户操作，不许后台持续查。宿主据此改做逐会话限频发现：
         // `users.conversations` 一页列一批会话，每个同步范围以外的再用一次 `conversations.history` 探测；
@@ -188,6 +190,10 @@ pub(crate) fn capabilities() -> Capabilities {
         retranslate: false,
         message_maintenance: false,
         session: SessionCaps { renew: true },
+        // 不跨账号发收伙伴署名、不收宿主头像；性能自报由 SDK 运行时替插件声明（协议 v32）。
+        agent_attribution: Default::default(),
+        account: Default::default(),
+        perf: false,
     }
 }
 
@@ -227,7 +233,7 @@ pub(crate) fn initialize(params: pm::InitializeParams) -> Result<Value, RpcError
 
 /// `initialize` 的结果（不看宿主参数的那部分）。
 pub fn result() -> Value {
-    let mut result = serde_json::to_value(pm::InitializeResult {
+    serde_json::to_value(pm::InitializeResult {
         protocol_version: hhh_im_protocol::PROTOCOL_VERSION,
         provider: pm::ProviderInfo {
             id: PROVIDER_ID.into(),
@@ -241,11 +247,7 @@ pub fn result() -> Value {
         login_methods: login_methods(),
         actions: Vec::new(),
     })
-    .expect("握手结果总能写成 JSON");
-    // 表情写进文字的写法（协议 v31，可选字段）：本插件锁的协议包还没有这个字段，直接写进平台说明的 JSON；升级协议包时换成
-    // `EmojiRules::text_template`。
-    result["platform"]["emoji"]["textTemplate"] = Value::from(EMOJI_TEXT_TEMPLATE);
-    result
+    .expect("握手结果总能写成 JSON")
 }
 
 #[cfg(test)]

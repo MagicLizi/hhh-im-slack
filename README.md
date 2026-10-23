@@ -42,7 +42,7 @@ cargo clippy --all-targets
 装自检和打包工具：
 
 ```sh
-cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.9.0 hhh-im-protocol --features transport,package
+cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.10.0 hhh-im-protocol --features transport,package
 ```
 
 打包后自检，全部通过才算改好：
