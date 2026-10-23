@@ -17,7 +17,10 @@ async fn the_plugin_program_speaks_the_protocol_over_stdio() {
         )
         .await
         .unwrap();
-    assert_eq!(init, hhh_im_slack::server::initialize_result());
+    // SDK 运行时替插件声明性能自报（协议 v32），其余与插件自己写的握手一样。
+    let mut own = hhh_im_slack::server::initialize_result();
+    own["capabilities"]["perf"] = serde_json::Value::Bool(true);
+    assert_eq!(init, own);
     assert_eq!(conn.call("ping", json!({})).await.unwrap(), json!({}));
     let open = conn
         .call("session/open", json!({ "settings": {} }))

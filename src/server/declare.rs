@@ -68,9 +68,9 @@ pub(crate) fn platform() -> PlatformDesc {
         }),
         // 历史与话题一页最多 200 条（契约 client v11 §3.3）。
         page_max: Some(u32::from(HISTORY_PAGE_MAX)),
-        // 读历史与话题是 Slack 的第 3 档限速（每个工作区每分钟 50 次以上），合计留出余量（契约 client v11 §3.12）。
+        // 每分钟留出余量；逐会话发现会连续读，按 Slack 建议每秒至多一次，避免依赖突发额度。
         reads: Some(RateBudget {
-            per_second: 5,
+            per_second: 1,
             per_minute: 40,
         }),
         // 每个文件先查一次文件资料（第 4 档，每分钟 100 次以上），再下载。
@@ -124,9 +124,12 @@ pub(crate) fn platform() -> PlatformDesc {
             // Slack 的表情图不是白底。
             text_pattern: Some(EMOJI_TEXT_PATTERN.into()),
             white_background: false,
+            // 表情写进文字的写法（协议 v31）：宿主据此给输入框的表情按钮。
+            text_template: Some(EMOJI_TEXT_TEMPLATE.into()),
         }),
-        // 新版搜索 `assistant.search.context`（契约 client v29，2026-10-04 取样）：每页 20 条、发出后 15–30 秒收录；
-        // 限额按用户每分钟约 10 次、翻页也算，最快 30 秒一次。
+        // 不声明账号级 `recentActivity`：新版搜索官方只许响应用户操作，不许后台持续查。宿主据此改做逐会话限频发现：
+        // `users.conversations` 一页列一批会话，每个同步范围以外的再用一次 `conversations.history` 探测；
+        // `pages` / `cold_pages` 是一次读取最多翻几页会话列表，请求走上面的读取额度、按后台一级排队。
         discovery: Some(DiscoveryDesc {
             fastest_secs: 30,
             pages: 5,
@@ -137,6 +140,8 @@ pub(crate) fn platform() -> PlatformDesc {
         // 编辑过的消息 Slack 每次都带着 `edited`（契约 client v11 §3.6），不用按内容比较。
         edits_by_content: Vec::new(),
         retranslate_rules: Vec::new(),
+        content_repairs: Vec::new(),
+        content_rereads: Vec::new(),
     }
 }
 
@@ -148,7 +153,7 @@ pub(crate) fn capabilities() -> Capabilities {
             search: true,
             members: true,
             find_direct: true,
-            recent_activity: true,
+            recent_activity: false,
         },
         messages: MessageCaps {
             list: true,
@@ -183,7 +188,12 @@ pub(crate) fn capabilities() -> Capabilities {
         },
         events: Default::default(),
         retranslate: false,
+        message_maintenance: false,
         session: SessionCaps { renew: true },
+        // 不跨账号发收伙伴署名、不收宿主头像；性能自报由 SDK 运行时替插件声明（协议 v32）。
+        agent_attribution: Default::default(),
+        account: Default::default(),
+        perf: false,
     }
 }
 
@@ -223,7 +233,7 @@ pub(crate) fn initialize(params: pm::InitializeParams) -> Result<Value, RpcError
 
 /// `initialize` 的结果（不看宿主参数的那部分）。
 pub fn result() -> Value {
-    let mut result = serde_json::to_value(pm::InitializeResult {
+    serde_json::to_value(pm::InitializeResult {
         protocol_version: hhh_im_protocol::PROTOCOL_VERSION,
         provider: pm::ProviderInfo {
             id: PROVIDER_ID.into(),
@@ -232,15 +242,12 @@ pub fn result() -> Value {
         },
         platform: platform(),
         capabilities: capabilities(),
+        read_request_gating: true,
         settings: Vec::new(),
         login_methods: login_methods(),
         actions: Vec::new(),
     })
-    .expect("握手结果总能写成 JSON");
-    // 表情写进文字的写法（协议 v31，可选字段）：本插件锁的协议包还没有这个字段，直接写进平台说明的 JSON；升级协议包时换成
-    // `EmojiRules::text_template`。
-    result["platform"]["emoji"]["textTemplate"] = Value::from(EMOJI_TEXT_TEMPLATE);
-    result
+    .expect("握手结果总能写成 JSON")
 }
 
 #[cfg(test)]
@@ -279,6 +286,8 @@ mod tests {
         assert_eq!(value["provider"]["id"], "slack");
         assert_eq!(value["capabilities"]["people"]["bots"], true);
         assert_eq!(value["capabilities"]["people"]["batchMax"], 2000);
+        assert_eq!(value["platform"]["reads"]["perSecond"], 1);
+        assert_eq!(value["platform"]["reads"]["perMinute"], 40);
         // 只有「通过中继登录」一种，预填 HHH 的中继（https）；文字在宿主的预算内。
         let methods = value["loginMethods"].as_array().unwrap();
         assert_eq!(methods.len(), 1);

@@ -4,7 +4,7 @@
 #             私钥在私有的密钥仓库：<hhh-keys>/official/hhh-official-signing.key，不放进这个仓库、不贴进对话。
 #   -Publish：打好后发到清单 source 写的仓库；令牌放环境变量 HHH_IM_PUBLISH_TOKEN（或 GITHUB_TOKEN / GITLAB_TOKEN），不写进任何文件。
 # 目前只出 windows-x64 的包。
-# hhh-im-pack 没装时：cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.4.0 hhh-im-protocol --features transport,package
+# hhh-im-pack 没装时：cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.10.0 hhh-im-protocol --features transport,package
 param([string]$SignKey, [switch]$Publish)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot

@@ -188,8 +188,12 @@ impl Plugin for Server {
             // 能力里没声明：不能先查后发、不重新翻译旧消息；没有插件操作。
             Method::MessagesLookupSend
             | Method::MessagesRetranslate
+            | Method::MessagesMaintain
             | Method::ActionsStart
-            | Method::StepChoose => Err(Server::unsupported(&method)),
+            | Method::StepChoose
+            | Method::AccountAvatar
+            | Method::PerfStart
+            | Method::PerfStop => Err(Server::unsupported(&method)),
             // Slack 的登录不经宿主在本机收回调、也没有表单；其余是插件发给宿主的方法。
             Method::LoginCallback
             | Method::LoginSubmit
@@ -198,6 +202,8 @@ impl Plugin for Server {
             | Method::LoginFinished
             | Method::LoginFailed
             | Method::CredentialSave
+            | Method::RequestsAcquire
+            | Method::RequestsReceived
             | Method::SessionExpired
             | Method::SessionNotice
             | Method::EventsPush
@@ -208,7 +214,9 @@ impl Plugin for Server {
             | Method::ActionSubmit
             | Method::ActionCancel
             | Method::ActionFinished
-            | Method::ActionFailed => Err(runtime::method_not_found(&method)),
+            | Method::ActionFailed
+            | Method::HostUserName
+            | Method::PerfReport => Err(runtime::method_not_found(&method)),
         };
         Reply::from(result)
     }

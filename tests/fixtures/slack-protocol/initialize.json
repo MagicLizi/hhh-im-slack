@@ -4,7 +4,6 @@
       "findDirect": true,
       "list": true,
       "members": true,
-      "recentActivity": true,
       "search": true
     },
     "edit": true,
@@ -25,6 +24,7 @@
       "get": true,
       "search": true
     },
+    "perf": true,
     "reactions": {
       "add": true,
       "catalog": true,
@@ -125,7 +125,7 @@
     },
     "reads": {
       "perMinute": 40,
-      "perSecond": 5
+      "perSecond": 1
     },
     "threads": {
       "activityOnRoot": true,
@@ -143,7 +143,8 @@
   "provider": {
     "id": "slack",
     "name": "Slack",
-    "version": "1.0.4"
+    "version": "1.0.5"
   },
+  "readRequestGating": true,
   "settings": []
 }

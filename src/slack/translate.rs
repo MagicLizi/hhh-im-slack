@@ -213,6 +213,7 @@ pub(crate) fn message(conversation: &str, raw: &Value) -> Result<SlackMessage> {
             reactions: reactions.filter(|_| !deleted),
             raw: None,
             edit_draft: None,
+            agent_attribution: None,
         },
         parts,
         extras,

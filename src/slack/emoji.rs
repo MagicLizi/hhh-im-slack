@@ -114,6 +114,7 @@ impl CatalogItem {
                 aliases: Vec::new(),
                 tone: None,
                 tone_of: None,
+                in_text: true,
             },
             image_url: image_url.into(),
         }
@@ -124,9 +125,10 @@ impl CatalogItem {
 pub(crate) fn categories() -> Vec<EmojiCategory> {
     CATEGORIES
         .iter()
-        .map(|(id, name, _)| EmojiCategory {
+        .map(|(id, name, icon)| EmojiCategory {
             id: (*id).into(),
             name: (*name).into(),
+            icon: Some((*icon).into()),
         })
         .collect()
 }
