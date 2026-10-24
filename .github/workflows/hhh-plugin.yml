@@ -1,0 +1,195 @@
+# HHH IM 插件的统一检查与编译。
+# 本文件由 MagicLizi/hhh-release 统一维护（plugin-files/），插件仓库里不要直接改；改正本后同步过来。
+# 插件自己的设置（要出哪些系统等）在 .github/hhh-plugin.json。
+#
+# - 提 PR、推 main：按 checkTargets 编译、测试、自检，并试着合一次包（不发布）。
+# - 由 hhh-release 发起（带发布请求编号）：按 targets 编全部系统，合包核对后建一个草稿 Release。
+#   这里只能建草稿；签名与转正式只在 hhh-release 里做。
+name: hhh-plugin
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('发布草稿 {0}', inputs.request || '（只检查）') || github.event.pull_request.title || github.event.head_commit.message || github.workflow }}
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      request:
+        description: 发布请求编号（由 hhh-release 填；手动运行时留空，只检查、不建草稿）
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hhh-plugin-${{ github.event_name }}-${{ github.ref }}-${{ inputs.request }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  WASI_SDK_VERSION: '34'
+
+jobs:
+  plan:
+    name: 读配置
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      targets: ${{ steps.plan.outputs.targets }}
+      drop_targets: ${{ steps.plan.outputs.drop_targets }}
+      version: ${{ steps.plan.outputs.version }}
+      binary: ${{ steps.plan.outputs.binary }}
+      logo: ${{ steps.plan.outputs.logo }}
+      cargo_args: ${{ steps.plan.outputs.cargo_args }}
+      self_check_args: ${{ steps.plan.outputs.self_check_args }}
+      sdk_tag: ${{ steps.plan.outputs.sdk_tag }}
+      release: ${{ steps.plan.outputs.release }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        run: python3 .github/hhh-ci/plan.py
+        env:
+          HHH_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.request != '' }}
+
+  build:
+    name: 编译 ${{ matrix.target }}
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 缓存 cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ matrix.target }}-
+
+      - name: 装 wasi-sdk
+        if: matrix.target == 'wasm32-wasip2'
+        run: |
+          name="wasi-sdk-${WASI_SDK_VERSION}.0-x86_64-linux"
+          curl -fsSL "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_SDK_VERSION}/${name}.tar.gz" | tar -xz -C "$RUNNER_TEMP"
+          echo "WASI_SDK_PATH=$RUNNER_TEMP/$name" >> "$GITHUB_ENV"
+
+      - name: 缓存自检工具
+        if: matrix.native
+        uses: actions/cache@v4
+        with:
+          path: ~/.hhh-im-tools
+          key: hhh-im-tools-${{ runner.os }}-${{ runner.arch }}-${{ needs.plan.outputs.sdk_tag }}
+
+      - name: 装自检工具（${{ needs.plan.outputs.sdk_tag }}）
+        if: matrix.native
+        run: bash .github/hhh-ci/tools.sh "${{ needs.plan.outputs.sdk_tag }}"
+
+      - name: 编译前准备
+        run: bash .github/hhh-ci/prepare.sh
+        env:
+          HHH_TARGET: ${{ matrix.target }}
+          HHH_RUST_TARGET: ${{ matrix.rust_target }}
+          HHH_PREPARE: ${{ matrix.prepare }}
+
+      - name: 格式与 lint
+        if: matrix.lint
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --all-targets --locked -- -D warnings
+
+      - name: 测试
+        if: matrix.native
+        run: cargo test --locked
+
+      - name: 编译
+        run: bash .github/hhh-ci/build.sh
+        env:
+          HHH_TARGET: ${{ matrix.target }}
+          HHH_RUST_TARGET: ${{ matrix.rust_target }}
+          HHH_EXT: ${{ matrix.ext }}
+          HHH_BINARY: ${{ needs.plan.outputs.binary }}
+          HHH_LOGO: ${{ needs.plan.outputs.logo }}
+          HHH_CARGO_ARGS: ${{ needs.plan.outputs.cargo_args }}
+
+      - name: 自检
+        if: matrix.native
+        run: |
+          manifest="$PWD/dist/stage-${{ matrix.target }}/hhh-im-provider.json"
+          if command -v cygpath >/dev/null 2>&1; then manifest="$(cygpath -w "$manifest")"; fi
+          hhh-im-check "$manifest" ${{ needs.plan.outputs.self_check_args }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage-${{ matrix.target }}
+          path: dist/stage-${{ matrix.target }}
+          retention-days: 7
+
+  assemble:
+    name: 合包与核对
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 缓存打包工具
+        uses: actions/cache@v4
+        with:
+          path: ~/.hhh-im-tools
+          key: hhh-im-tools-${{ runner.os }}-${{ runner.arch }}-${{ needs.plan.outputs.sdk_tag }}
+
+      - name: 装打包工具（${{ needs.plan.outputs.sdk_tag }}）
+        run: bash .github/hhh-ci/tools.sh "${{ needs.plan.outputs.sdk_tag }}"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: stage-*
+          path: dist
+
+      - name: 合包与核对
+        run: bash .github/hhh-ci/assemble.sh
+        env:
+          HHH_VERSION: ${{ needs.plan.outputs.version }}
+          HHH_TARGETS: ${{ needs.plan.outputs.targets }}
+          HHH_DROP_TARGETS: ${{ needs.plan.outputs.drop_targets }}
+          HHH_RELEASE: ${{ needs.plan.outputs.release }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hhh-release
+          path: dist/release
+          retention-days: 14
+
+  draft:
+    name: 建草稿 Release
+    if: needs.plan.outputs.release == 'true'
+    needs: [plan, assemble]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: hhh-release
+          path: dist/release
+
+      - name: 建草稿
+        run: bash .github/hhh-ci/draft.sh
+        env:
+          HHH_VERSION: ${{ needs.plan.outputs.version }}
+          HHH_REQUEST: ${{ inputs.request }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
