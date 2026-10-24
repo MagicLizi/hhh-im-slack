@@ -77,10 +77,7 @@
 
 ## 发版本
 
-发布只在私有中控仓库 `MagicLizi/hhh-release` 里做，用「发版本」skill：
+用「发版本」skill：步骤正本是私有中控仓库 `MagicLizi/hhh-release` 的 `RELEASING.md`，agent 拟好版本号和更新说明、和用户确认后一次发完。发布只在 hhh-release 里做；要出哪些系统写在 `.github/hhh-plugin.json`。
 
-1. 改 `version`（清单 `hhh-im-provider.json` 与 `Cargo.toml`），写 `notes.md`，开 PR 合进 main；PR 上的 `hhh-plugin` 检查要全部通过。不用自己打标签。
-2. 维护者在 hhh-release 运行「插件发布 ① 编译并建草稿」，核对结果后运行「插件发布 ② 签名并转正式」。
-
-- 要出哪些系统写在 `.github/hhh-plugin.json`；`.github/workflows/hhh-plugin.yml` 与 `.github/hhh-ci/` 由 hhh-release 统一维护，不在这里直接改。
+- `.github/workflows/hhh-plugin.yml`、`.github/hhh-ci/` 与发版 skill 由 hhh-release 统一维护、同步过来，不在这里改。
 - 官方私钥只在 hhh-release 的 Secrets 里，**永远不进这个仓库**：不复制进来，不写进脚本或配置，也不贴进对话。

@@ -64,11 +64,10 @@ hhh-im-check dist/stage/hhh-im-provider.json
 
 发布在私有中控仓库 `MagicLizi/hhh-release` 里统一做（只有维护者能操作）：
 
-1. 改清单 `hhh-im-provider.json` 与 `Cargo.toml` 里的 `version`，写好 `notes.md`（给用户看的更新说明），开 PR 合进 main。
-2. 在 hhh-release 运行「插件发布 ① 编译并建草稿」：本仓库的 `hhh-plugin` 工作流在 main 上编 Windows、M 芯片 Mac、Intel Mac 的包，合成一份版本索引，建草稿 Release（用户看不到）。
-3. 核对后运行「插件发布 ② 签名并转正式」：签上官方签名，转成正式版本，HHH 用户这时看到更新。
+- **让 agent 发**：在 HHH 仓库说“发布Slack插件”，agent 用 `hhh-im-release` skill 读改动、拟版本号和更新说明，你确认后一次发完。
+- **自己点**：hhh-release 的 Actions →「插件发布（一键）」，选插件、填版本号和更新说明。
 
-要出哪些系统写在 `.github/hhh-plugin.json`。平时提 PR、推 main 时，同一个工作流会编译、测试、自检，并试着合一次包。
+两种方式都会把版本号和说明合进 main，再编 Windows、M 芯片 Mac、Intel Mac 的包、核对、签官方签名、转正式。要出哪些系统写在 `.github/hhh-plugin.json`。
 详细规矩见 [hhh-im-sdk 的发版本规范](https://github.com/MagicLizi/hhh-im-sdk/blob/main/docs/release.md)。
 
 ## 仓库里有什么
