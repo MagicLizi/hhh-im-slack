@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "slack",
   "name": "Slack",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "command": "hhh-im-slack",
   "os": ["windows", "macos"],
   "logo": "logo.svg",
