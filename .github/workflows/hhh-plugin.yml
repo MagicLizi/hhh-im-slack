@@ -9,9 +9,12 @@ name: hhh-plugin
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('发布草稿 {0}', inputs.request || '（只检查）') || github.event.pull_request.title || github.event.head_commit.message || github.workflow }}
 
 on:
+  # 只改文档（说明、skill、许可证）时不编译。
   pull_request:
+    paths-ignore: ['**.md', '.agents/**', '.claude/**', 'LICENSE']
   push:
     branches: [main]
+    paths-ignore: ['**.md', '.agents/**', '.claude/**', 'LICENSE']
   workflow_dispatch:
     inputs:
       request:
