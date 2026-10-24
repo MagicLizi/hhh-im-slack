@@ -28,13 +28,46 @@ if [ "${HHH_RELEASE:-false}" = "true" ]; then
     fi
 fi
 
+# 更新说明：notes.md 不超过 2000 字时整份用；超过时从最新的 “### 版本” 小节往下取整节，取到不超过 2000 字为止。
+# 发布时必须有这个版本的小节（没写这次的更新说明就不发）。
+notes="$out/notes.md"
+python3 - notes.md "$notes" "$version" "${HHH_RELEASE:-false}" <<'PY'
+import re, sys
+source, target, version, release = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == "true"
+LIMIT = 2000
+text = open(source, encoding="utf-8").read().strip() + "\n"
+heads = list(re.finditer(r"(?m)^#{1,6}\s*v?(\d+\.\d+\.\d+)\s*$", text))
+if not any(h.group(1) == version for h in heads):
+    message = f"notes.md 里没有 “### {version}” 这一节：先写这次的更新说明。"
+    if release:
+        print(f"::error::{message}")
+        sys.exit(1)
+    print(f"::warning::{message}")
+if len(text) > LIMIT:
+    if not heads:
+        print(f"::error::notes.md 超过 {LIMIT} 字，又没有按 “### 版本” 分节，取不出这次的说明。")
+        sys.exit(1)
+    sections = [text[h.start():(heads[i + 1].start() if i + 1 < len(heads) else len(text))].strip() for i, h in enumerate(heads)]
+    chosen = []
+    for section in sections:
+        if len("\n\n".join(chosen + [section])) + 1 > LIMIT:
+            break
+        chosen.append(section)
+    if not chosen:
+        print(f"::error::notes.md 最新一节就超过 {LIMIT} 字，写短一些。")
+        sys.exit(1)
+    text = "\n\n".join(chosen) + "\n"
+    print(f"notes.md 超过 {LIMIT} 字，取最新的 {len(chosen)} 节（{len(text)} 字）。")
+open(target, "w", encoding="utf-8").write(text)
+PY
+
 for target in $HHH_TARGETS; do
     stage="dist/stage-$target"
     if [ ! -f "$stage/hhh-im-provider.json" ]; then
         echo "::error::缺少 $target 编好的文件（${stage}）。"
         exit 1
     fi
-    hhh-im-pack "$stage" --target "$target" --out "$out" --notes notes.md --tag "$tag" ${after[@]+"${after[@]}"}
+    hhh-im-pack "$stage" --target "$target" --out "$out" --notes "$notes" --tag "$tag" ${after[@]+"${after[@]}"}
 done
 
 # 系统不能比上一个正式版本少。

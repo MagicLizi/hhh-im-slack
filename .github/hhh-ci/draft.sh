@@ -10,7 +10,7 @@ for id in $(gh api "repos/$GH_REPO/releases?per_page=100" --jq ".[] | select(.dr
     echo "删掉旧草稿 $id"
     gh api -X DELETE "repos/$GH_REPO/releases/$id"
 done
-gh release create "$tag" --draft --target "$GITHUB_SHA" --title "$tag" --notes-file notes.md \
+gh release create "$tag" --draft --target "$GITHUB_SHA" --title "$tag" --notes-file dist/release/notes.md \
     dist/release/*.hhhim dist/release/hhhim-release.json
 {
     echo "### 已建草稿 $tag"

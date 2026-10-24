@@ -94,6 +94,13 @@ jobs:
         if: matrix.native
         run: bash .github/hhh-ci/tools.sh "${{ needs.plan.outputs.sdk_tag }}"
 
+      - name: 编译前准备
+        run: bash .github/hhh-ci/prepare.sh
+        env:
+          HHH_TARGET: ${{ matrix.target }}
+          HHH_RUST_TARGET: ${{ matrix.rust_target }}
+          HHH_PREPARE: ${{ matrix.prepare }}
+
       - name: 格式与 lint
         if: matrix.lint
         run: |
@@ -110,7 +117,6 @@ jobs:
           HHH_TARGET: ${{ matrix.target }}
           HHH_RUST_TARGET: ${{ matrix.rust_target }}
           HHH_EXT: ${{ matrix.ext }}
-          HHH_PREPARE: ${{ matrix.prepare }}
           HHH_BINARY: ${{ needs.plan.outputs.binary }}
           HHH_LOGO: ${{ needs.plan.outputs.logo }}
           HHH_CARGO_ARGS: ${{ needs.plan.outputs.cargo_args }}
