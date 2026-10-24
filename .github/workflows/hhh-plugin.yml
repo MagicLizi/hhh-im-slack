@@ -51,6 +51,13 @@ jobs:
         run: python3 .github/hhh-ci/plan.py
         env:
           HHH_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.request != '' }}
+      - name: 发布前先查（版本、更新说明）
+        if: steps.plan.outputs.release == 'true'
+        run: bash .github/hhh-ci/precheck.sh
+        env:
+          HHH_VERSION: ${{ steps.plan.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
 
   build:
     name: 编译 ${{ matrix.target }}
