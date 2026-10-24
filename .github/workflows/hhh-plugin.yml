@@ -46,7 +46,7 @@ jobs:
       sdk_tag: ${{ steps.plan.outputs.sdk_tag }}
       release: ${{ steps.plan.outputs.release }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: plan
         run: python3 .github/hhh-ci/plan.py
         env:
@@ -70,10 +70,10 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 缓存 cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry/index
@@ -92,7 +92,7 @@ jobs:
 
       - name: 缓存自检工具
         if: matrix.native
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.hhh-im-tools
           key: hhh-im-tools-${{ runner.os }}-${{ runner.arch }}-${{ needs.plan.outputs.sdk_tag }}
@@ -135,10 +135,11 @@ jobs:
           if command -v cygpath >/dev/null 2>&1; then manifest="$(cygpath -w "$manifest")"; fi
           hhh-im-check "$manifest" ${{ needs.plan.outputs.self_check_args }}
 
-      - uses: actions/upload-artifact@v4
+      # 传整个 dist/（里面只有 stage-<系统>/），下载合并后每个系统各在自己的目录里，一个系统时也一样。
+      - uses: actions/upload-artifact@v7
         with:
           name: stage-${{ matrix.target }}
-          path: dist/stage-${{ matrix.target }}
+          path: dist
           retention-days: 7
 
   assemble:
@@ -146,10 +147,10 @@ jobs:
     needs: [plan, build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 缓存打包工具
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.hhh-im-tools
           key: hhh-im-tools-${{ runner.os }}-${{ runner.arch }}-${{ needs.plan.outputs.sdk_tag }}
@@ -157,10 +158,11 @@ jobs:
       - name: 装打包工具（${{ needs.plan.outputs.sdk_tag }}）
         run: bash .github/hhh-ci/tools.sh "${{ needs.plan.outputs.sdk_tag }}"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: stage-*
           path: dist
+          merge-multiple: true
 
       - name: 合包与核对
         run: bash .github/hhh-ci/assemble.sh
@@ -172,7 +174,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: hhh-release
           path: dist/release
@@ -186,9 +188,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: hhh-release
           path: dist/release
