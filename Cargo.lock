@@ -455,7 +455,7 @@ dependencies = [
 
 [[package]]
 name = "hhh-im-slack"
-version = "1.0.6"
+version = "1.0.7"
 dependencies = [
  "base64 0.22.1",
  "getrandom 0.3.4",
