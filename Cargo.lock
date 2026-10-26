@@ -439,8 +439,8 @@ checksum = "e17592d60ebacc7d5e169f4663c5f84f9161cc90328abcfe8456f41e4dfcb284"
 
 [[package]]
 name = "hhh-im-protocol"
-version = "0.10.0"
-source = "git+https://github.com/MagicLizi/hhh-im-sdk?tag=v0.10.0#8595a48c339a19859df224502f43690f777f526c"
+version = "0.12.0"
+source = "git+https://github.com/MagicLizi/hhh-im-sdk?tag=v0.12.0#027062b0bb8e2d6854cfddd02d334ec9948911ce"
 dependencies = [
  "base64 0.22.1",
  "regex-lite",

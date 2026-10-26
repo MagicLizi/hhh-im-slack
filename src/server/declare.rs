@@ -10,7 +10,7 @@ use hhh_im_protocol::platform::{
     ActionRules, Adjustable, AvatarIdentity, AvatarShape, Broadcast, Capabilities,
     ConversationCaps, ConversationNouns, DiscoveryDesc, EditRule, EmojiRules, HistoryMode, Limits,
     MessageCaps, OwnWithin, PeopleCaps, PlatformDesc, RateBudget, ReactionCaps, ReadIntervalsSecs,
-    ResourceCaps, SendCaps, SessionCaps, Threads, UnlistedEmoji,
+    ResourceCaps, RichFormat, RichSendCaps, SendCaps, SessionCaps, Threads, UnlistedEmoji,
 };
 use hhh_im_protocol::rpc::RpcError;
 use serde_json::Value;
@@ -148,6 +148,7 @@ pub(crate) fn platform() -> PlatformDesc {
 /// 能力：内置 Slack 做得到的都声明；不推送（今天的 Slack 靠定时读）。
 pub(crate) fn capabilities() -> Capabilities {
     Capabilities {
+        conversation_groups: Default::default(),
         conversations: ConversationCaps {
             list: true,
             search: true,
@@ -176,6 +177,19 @@ pub(crate) fn capabilities() -> Capabilities {
         }),
         recall: true,
         edit: true,
+        rich_send: RichSendCaps {
+            formats: vec![
+                RichFormat::Strong,
+                RichFormat::Emphasis,
+                RichFormat::Delete,
+                RichFormat::InlineCode,
+                RichFormat::Link,
+                RichFormat::Blockquote,
+                RichFormat::List,
+                RichFormat::Code,
+            ],
+            edit: true,
+        },
         reactions: ReactionCaps {
             list: true,
             add: true,

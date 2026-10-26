@@ -552,7 +552,7 @@ pub(crate) fn ts_millis(ts: &str) -> Option<i64> {
 
 /// 提及能不能原样编辑回去（契约 client v11 §3.6、v18 §2.4，同内置）：发送只会写人与 `@channel`；`@here`、用户组的
 /// 提及编辑后会变样，不算能编辑。
-fn editable_mention(person: Option<&PersonRef>, everyone: bool) -> bool {
+pub(crate) fn editable_mention(person: Option<&PersonRef>, everyone: bool) -> bool {
     match (person, everyone) {
         (person, true) => person.is_none_or(|p| p.name.as_deref() == Some("channel")),
         (Some(person), false) => person.id_type.as_deref() == Some(USER_ID_TYPE),
@@ -632,7 +632,7 @@ pub(crate) fn edit_draft(parts: &[Part]) -> Option<Vec<Outgoing>> {
         }
     }
     if !editable(parts) {
-        return None;
+        return super::rich_send::edit_draft(parts);
     }
     let mut out = Vec::new();
     for part in parts {

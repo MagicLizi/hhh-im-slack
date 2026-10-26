@@ -37,6 +37,19 @@
       "read": true
     },
     "retranslate": false,
+    "richSend": {
+      "edit": true,
+      "formats": [
+        "strong",
+        "emphasis",
+        "delete",
+        "inlineCode",
+        "link",
+        "blockquote",
+        "list",
+        "code"
+      ]
+    },
     "send": {
       "file": true,
       "image": true,

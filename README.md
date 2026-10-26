@@ -18,13 +18,14 @@ Slack 的登录，不用重新登录。
 - **内容**：文字、提及（人、用户组、`@here`、`@channel`）、格式正文（mrkdwn 与 rich_text）、卡片（Block Kit 与旧版附件、链接预览）、
   图片、文件、视频封面、工作区自定义表情。
 - **发送与动作**：在话题里回复、同时发到频道、@某人与 @所有人、发图片和文件、编辑、撤回、加表情回应、去掉表情回应。
+- **格式发送与编辑**：粗体、斜体、删除线、行内代码、链接、列表、引用和代码块转成原生 `rich_text`；表情与提及保留结构，编辑草稿保留可完整写回的格式。Slack 不声明下划线。
 - **资源**：图片、文件、头像、表情图都分段交给 HHH。
 
 聊天记录、凭据和配置都由 HHH 保存，插件自己不存。
 
 ## 构建
 
-构建固定依赖公开 SDK `v0.9.0`，无需本地路径替换。新宿主可在每条读取发出前控制节奏，并以交付回执避免通信恢复时集中兑现积压许可；旧宿主保留原许可或请求计数兼容路径。
+格式发送使用公开 SDK `v0.12.0` 的 `Outgoing::Rich` 与 `capabilities.richSend`，需要带 IM SDK 0.12.0 或更新版本的 HHH。构建固定公开标签，不依赖本地源码替换。读取额度仍保留旧宿主的兼容路径。
 
 ```sh
 cargo build --release
@@ -42,7 +43,7 @@ cargo clippy --all-targets
 装自检和打包工具：
 
 ```sh
-cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.10.0 hhh-im-protocol --features transport,package
+cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.12.0 hhh-im-protocol --features transport,package
 ```
 
 打包后自检，全部通过才算改好：

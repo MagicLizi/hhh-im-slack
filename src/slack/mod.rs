@@ -17,6 +17,7 @@ pub(crate) mod mrkdwn;
 mod names;
 pub(crate) mod parts;
 mod rich;
+mod rich_send;
 pub(crate) mod translate;
 
 pub use auth::{LoginRequest, SlackAuth, SlackLogin, SlackPendingLogin, missing_scopes};
@@ -606,12 +607,21 @@ impl SlackClient {
             check_ts(ts)?;
         }
         check_operation_id(client_msg_id)?;
-        let text = outgoing_text(content)?;
+        let rich = rich_send::outgoing(content)?;
+        let text = match &rich {
+            Some((text, _)) => text.clone(),
+            None => outgoing_text(content)?,
+        };
         let mut form = vec![
             ("channel", conversation),
             ("text", text.as_str()),
             ("client_msg_id", client_msg_id),
         ];
+        if let Some((_, blocks)) = &rich {
+            form.push(("blocks", blocks));
+            form.push(("mrkdwn", "false"));
+            form.push(("parse", "none"));
+        }
         push_optional(&mut form, "thread_ts", thread_ts);
         if reply_broadcast && thread_ts.is_some() {
             form.push(("reply_broadcast", "true"));
