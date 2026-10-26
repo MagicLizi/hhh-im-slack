@@ -168,6 +168,173 @@
   ],
   "conversationId": "C000000099",
   "createdAtMs": 1759000002000,
+  "editDraft": [
+    {
+      "root": {
+        "children": [
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "type": "inlineCode",
+                    "value": "文字44"
+                  }
+                ],
+                "type": "strong"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "type": "text",
+                "value": "文字45"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字46 文字47(文字48) 文字49 文字50(文字51)"
+                  }
+                ],
+                "type": "strong"
+              },
+              {
+                "type": "text",
+                "value": " 文字52"
+              },
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字53"
+                  }
+                ],
+                "type": "strong"
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "type": "text",
+                        "value": "文字54"
+                      }
+                    ],
+                    "type": "link",
+                    "url": "https://example.com/p/6"
+                  }
+                ],
+                "type": "strong"
+              },
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字55"
+                  }
+                ],
+                "type": "strong"
+              },
+              {
+                "type": "text",
+                "value": "文字56"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字57"
+                  }
+                ],
+                "type": "strong"
+              },
+              {
+                "type": "text",
+                "value": "文字58(文字59)文字60 "
+              },
+              {
+                "children": [
+                  {
+                    "children": [
+                      {
+                        "type": "text",
+                        "value": "#文字61"
+                      }
+                    ],
+                    "type": "link",
+                    "url": "https://example.com/p/7"
+                  }
+                ],
+                "type": "strong"
+              },
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": " "
+                  }
+                ],
+                "type": "link",
+                "url": "https://example.com/p/8"
+              },
+              {
+                "type": "text",
+                "value": "文字62"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "children": [
+                  {
+                    "emojiType": "mega",
+                    "type": "emoji"
+                  }
+                ],
+                "type": "strong"
+              },
+              {
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "文字63"
+                  }
+                ],
+                "type": "strong"
+              }
+            ],
+            "type": "paragraph"
+          },
+          {
+            "children": [
+              {
+                "type": "text",
+                "value": "文字64 文字65"
+              }
+            ],
+            "type": "paragraph"
+          }
+        ],
+        "type": "root"
+      },
+      "type": "rich"
+    }
+  ],
   "id": "1759000002.000002",
   "reactions": [
     {

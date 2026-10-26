@@ -495,3 +495,72 @@ async fn relay_refresh_answers_keep_reauthorization_apart_from_temporary_trouble
         "中继连不上：暂时故障"
     );
 }
+
+/// 格式正文走 Slack 原生 blocks；发送和编辑保持一致，不把输入里的 Markdown 或 @ 文本再解释一遍。
+#[tokio::test]
+async fn rich_send_and_edit_use_native_blocks_and_keep_edit_drafts() {
+    let slack = MockServer::start().await;
+    let host = online(&slack).await;
+    let ts = "1759000100.000100";
+    let blocks = json!([{"type":"rich_text","elements":[{"type":"rich_text_section","elements":[
+        {"type":"text","text":"粗体","style":{"bold":true}},
+        {"type":"emoji","name":"wave"},
+        {"type":"text","text":" *原样* @here"}
+    ]}]}]);
+    let message = json!({"type":"message","user":ME,"ts":ts,"text":"粗体:wave: *原样* @here","blocks":blocks});
+    Mock::given(method("POST"))
+        .and(path("/api/chat.postMessage"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"ok":true,"channel":CONVERSATION,"ts":ts,"message":message})),
+        )
+        .expect(1)
+        .mount(&slack)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/api/chat.update"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"ok":true})))
+        .expect(1)
+        .mount(&slack)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/api/conversations.history"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"ok":true,"has_more":false,"messages":[message]})),
+        )
+        .mount(&slack)
+        .await;
+    let content = json!([{"type":"rich","root":{"type":"root","children":[{"type":"paragraph","children":[
+        {"type":"strong","children":[{"type":"text","value":"粗体"}]},
+        {"type":"emoji","emojiType":"wave"},
+        {"type":"text","value":" *原样* @here"}
+    ]}]}}]);
+    let sent = host.ok("messages/send", json!({"operationId":"rich-op-1","target":{"type":"conversation","conversationId":CONVERSATION},"content":content})).await;
+    assert_eq!(sent["state"], "accepted");
+    assert_eq!(sent["message"]["editDraft"], content);
+    let edited = host
+        .ok(
+            "messages/edit",
+            json!({"conversationId":CONVERSATION,"messageId":ts,"content":content}),
+        )
+        .await;
+    assert_eq!(edited["editDraft"], content);
+    for name in ["chat.postMessage", "chat.update"] {
+        let requests = requests_to(&slack, name).await;
+        let fields = form(&requests[0]);
+        assert_eq!(
+            serde_json::from_str::<Value>(&fields["blocks"]).unwrap(),
+            blocks
+        );
+        assert_eq!(fields["text"], "粗体:wave: *原样* @here");
+        if name == "chat.postMessage" {
+            assert_eq!(fields["mrkdwn"], "false");
+        }
+        assert_eq!(fields["parse"], "none");
+    }
+    assert_eq!(
+        form(&requests_to(&slack, "chat.postMessage").await[0])["client_msg_id"],
+        "rich-op-1"
+    );
+}

@@ -36,6 +36,41 @@
   ],
   "conversationId": "C000000099",
   "createdAtMs": 1759000019000,
+  "editDraft": [
+    {
+      "root": {
+        "children": [
+          {
+            "children": [
+              {
+                "type": "text",
+                "value": "文字639 文字640 "
+              },
+              {
+                "type": "inlineCode",
+                "value": "文字641"
+              },
+              {
+                "type": "text",
+                "value": " 文字642"
+              },
+              {
+                "emojiType": "pray",
+                "type": "emoji"
+              },
+              {
+                "type": "text",
+                "value": " (文字643 文字644)"
+              }
+            ],
+            "type": "paragraph"
+          }
+        ],
+        "type": "root"
+      },
+      "type": "rich"
+    }
+  ],
   "id": "1759000019.000019",
   "reactions": [
     {

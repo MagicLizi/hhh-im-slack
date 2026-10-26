@@ -912,13 +912,21 @@ impl SlackClient {
     ) -> Result<Message> {
         check_id(conversation)?;
         check_ts(id)?;
-        let text = outgoing_text(content)?;
-        let value = self
-            .write(
-                "chat.update",
-                &[("channel", conversation), ("ts", id), ("text", &text)],
-            )
-            .await?;
+        let rich = super::rich_send::outgoing(content)?;
+        let text = match &rich {
+            Some((text, _)) => text.clone(),
+            None => outgoing_text(content)?,
+        };
+        let mut form = vec![
+            ("channel", conversation),
+            ("ts", id),
+            ("text", text.as_str()),
+        ];
+        if let Some((_, blocks)) = &rich {
+            form.push(("blocks", blocks));
+            form.push(("parse", "none"));
+        }
+        let value = self.write("chat.update", &form).await?;
         tracing::info!("Slack 消息已编辑");
         let mut read = self.find_message(conversation, id).await;
         // 重读暂时失败（网络、限流）时等一下再读一次：编辑回执里没有话题归属，宿主拿它换掉本地那条时，话题回复会
@@ -1460,7 +1468,15 @@ mod tests {
             lang: None,
             value: "x".into(),
         }])];
-        assert_eq!(translate::edit_draft(&code), None);
+        assert_eq!(
+            translate::edit_draft(&code),
+            Some(vec![hhh_im_protocol::content::rich_outgoing(vec![
+                RichNode::Code {
+                    lang: None,
+                    value: "x".into(),
+                }
+            ])])
+        );
         // @here、用户组的提及发送时写不出来，编辑后会变样：不算能编辑。
         for mention in [
             mrkdwn::everyone_mention("here"),
@@ -1482,7 +1498,7 @@ mod tests {
             translate::edit_draft(&[Part::Text("hi".into())]),
             Some(vec![Outgoing::Text { text: "hi".into() }])
         );
-        // 带文字说明的链接（编辑后说明会丢）、带文件的不能编辑。
+        // 新编辑器交回格式正文，带说明的链接也能原样编辑。
         let labelled = vec![Part::Rich(vec![RichNode::Paragraph {
             children: vec![RichNode::Link {
                 url: "https://example.com".into(),
@@ -1491,7 +1507,13 @@ mod tests {
                 }],
             }],
         }])];
-        assert_eq!(translate::edit_draft(&labelled), None);
+        let Part::Rich(nodes) = &labelled[0] else {
+            panic!()
+        };
+        assert_eq!(
+            translate::edit_draft(&labelled),
+            Some(vec![hhh_im_protocol::content::rich_outgoing(nodes.clone())])
+        );
     }
 
     #[test]
