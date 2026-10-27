@@ -148,6 +148,7 @@ pub(crate) fn platform() -> PlatformDesc {
 /// 能力：内置 Slack 做得到的都声明；不推送（今天的 Slack 靠定时读）。
 pub(crate) fn capabilities() -> Capabilities {
     Capabilities {
+        stickers: Default::default(),
         conversation_groups: Default::default(),
         conversations: ConversationCaps {
             list: true,
@@ -197,6 +198,7 @@ pub(crate) fn capabilities() -> Capabilities {
             catalog: true,
         },
         resources: ResourceCaps {
+            variants: true,
             read: true,
             avatars: true,
         },
