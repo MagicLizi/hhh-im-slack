@@ -10,6 +10,7 @@ mod auth;
 mod card;
 mod emoji;
 mod errors;
+mod forwarded;
 #[cfg(test)]
 mod goldens;
 pub(crate) mod methods;

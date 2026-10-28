@@ -199,6 +199,7 @@ pub(crate) fn message(conversation: &str, raw: &Value) -> Result<SlackMessage> {
     });
     Ok(SlackMessage {
         message: Message {
+            read_position: None,
             id: ts.to_owned(),
             conversation_id: conversation.to_owned(),
             sender,
@@ -321,6 +322,10 @@ fn sender_of(raw: &Value, system: bool) -> Sender {
 /// 正文：先按块的顺序翻（连续的 `rich_text` 合成一段格式正文，连续的其他块合成一张卡片），
 /// 没有块时解析 `text`；再接文件，最后是附件。
 fn body(raw: &Value) -> Vec<Part> {
+    body_at(raw, 0, &mut 0)
+}
+
+pub(super) fn body_at(raw: &Value, depth: usize, used: &mut usize) -> Vec<Part> {
     let mut out = Vec::new();
     let blocks = array(raw, "blocks");
     if blocks.is_empty() {
@@ -345,7 +350,11 @@ fn body(raw: &Value) -> Vec<Part> {
         out.push(file_content(file));
     }
     for attachment in array(raw, "attachments") {
-        out.extend(card::from_attachment(attachment));
+        if let Some(record) = super::forwarded::attachment(attachment, depth, used) {
+            out.push(record);
+        } else {
+            out.extend(card::from_attachment(attachment));
+        }
     }
     out
 }
@@ -442,6 +451,7 @@ fn file_content(file: &Value) -> Part {
         .find(|n| !n.is_empty())
         .map(str::to_owned);
     let mut resource = Resource {
+        voice: false,
         key: id.to_owned(),
         kind,
         mime: (!mime.is_empty()).then(|| mime.to_owned()),

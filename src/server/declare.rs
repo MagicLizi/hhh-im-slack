@@ -148,8 +148,10 @@ pub(crate) fn platform() -> PlatformDesc {
 /// 能力：内置 Slack 做得到的都声明；不推送（今天的 Slack 靠定时读）。
 pub(crate) fn capabilities() -> Capabilities {
     Capabilities {
+        receipts: None,
+        mark_read: None,
+        read_sync: None,
         stickers: Default::default(),
-        conversation_groups: Default::default(),
         conversations: ConversationCaps {
             list: true,
             search: true,
@@ -160,9 +162,11 @@ pub(crate) fn capabilities() -> Capabilities {
         messages: MessageCaps {
             list: true,
             get: true,
+            forwarded: true,
         },
         // 机器人按编号读（`bots.info`）；一批取到人名册一次查询的上限，整份成员名单读一遍就认出一大批人。
         people: PeopleCaps {
+            contacts: false,
             get: true,
             search: true,
             bots: true,

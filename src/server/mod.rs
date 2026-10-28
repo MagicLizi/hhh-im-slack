@@ -190,8 +190,7 @@ impl Plugin for Server {
             Method::MessagesLookupSend
             | Method::MessagesRetranslate
             | Method::MessagesMaintain
-            | Method::ConversationGroupsList
-            | Method::ConversationGroupsMembers
+            | Method::ContactsList
             | Method::ActionsStart
             | Method::StepChoose
             | Method::AccountAvatar

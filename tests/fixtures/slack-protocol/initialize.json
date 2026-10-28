@@ -16,7 +16,8 @@
     },
     "messages": {
       "get": true,
-      "list": true
+      "list": true,
+      "forwarded": true
     },
     "people": {
       "batchMax": 2000,
