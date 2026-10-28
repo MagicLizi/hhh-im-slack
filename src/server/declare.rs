@@ -149,7 +149,16 @@ pub(crate) fn platform() -> PlatformDesc {
 pub(crate) fn capabilities() -> Capabilities {
     Capabilities {
         stickers: Default::default(),
-        conversation_groups: Default::default(),
+        receipts: None,
+        mark_read: None,
+        read_sync: Some(hhh_im_protocol::reading::ReadSyncCaps {
+            scopes: hhh_im_protocol::reading::ReadScopes {
+                conversations: true,
+                threads: false,
+            },
+            watermark: true,
+            individual: false,
+        }),
         conversations: ConversationCaps {
             list: true,
             search: true,
@@ -160,9 +169,11 @@ pub(crate) fn capabilities() -> Capabilities {
         messages: MessageCaps {
             list: true,
             get: true,
+            forwarded: false,
         },
         // 机器人按编号读（`bots.info`）；一批取到人名册一次查询的上限，整份成员名单读一遍就认出一大批人。
         people: PeopleCaps {
+            contacts: false,
             get: true,
             search: true,
             bots: true,

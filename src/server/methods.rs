@@ -53,6 +53,18 @@ fn to_value(value: impl serde::Serialize) -> Value {
 }
 
 impl Server {
+    pub(crate) async fn reading_sync(
+        &self,
+        params: hhh_im_protocol::reading::ReadSyncParams,
+    ) -> Result<Value, RpcError> {
+        self.with_client(|client| {
+            let params = params.clone();
+            async move { client.reading_sync(&params).await }
+        })
+        .await
+        .map(to_value)
+    }
+
     /// `conversations/list`。
     pub(crate) async fn conversations_list(
         &self,
