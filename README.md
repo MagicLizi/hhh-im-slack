@@ -26,7 +26,7 @@ Slack 的登录，不用重新登录。
 
 ## 构建
 
-格式发送使用 SDK 的 `Outgoing::Rich` 与 `capabilities.richSend`。阅读扩展尚待 SDK 正式发布及固定标签升级；当前任务通过仓库外的 `sdk-local.toml` 覆盖验证，尚不能只靠清单里的旧公开标签构建。正式构建仍使用已发布的固定标签。读取额度保留省略声明时的兼容路径。
+格式发送使用 SDK 的 `Outgoing::Rich` 与 `capabilities.richSend`。阅读扩展使用公开 SDK `v0.16.0` 的固定标签；构建不需要本地源码覆盖。安装与运行需要支持 IM SDK 0.16.0 或更新版本的 HHH。读取额度保留省略声明时的兼容路径。
 
 ```sh
 cargo build --release
@@ -44,7 +44,7 @@ cargo clippy --all-targets
 装自检和打包工具：
 
 ```sh
-cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.14.0 hhh-im-protocol --features transport,package
+cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.16.0 hhh-im-protocol --features transport,package
 ```
 
 打包后自检，全部通过才算改好：
@@ -90,4 +90,4 @@ hhh-im-check dist/stage/hhh-im-provider.json
 
 Slack 已生成的多档缩略图用于预览，url_private_download/url_private 对应的原件保留原始格式；视频封面只声明预览。
 
-新宿主经 `resources/describe` 选择实际版本，读取时带 `variant`；省略 `variant` 的旧调用仍按原来的方式读取；二进制安装仍需通过宿主的最低 SDK 检查。分段缓存包含实际版本，不把预览当成原件。本版固定使用 IM SDK v0.14.0，宿主需支持该版 SDK。
+新宿主经 `resources/describe` 选择实际版本，读取时带 `variant`；省略 `variant` 的旧调用仍按原来的方式读取；二进制安装仍需通过宿主的最低 SDK 检查。分段缓存包含实际版本，不把预览当成原件。本版固定使用 IM SDK v0.16.0，宿主需支持该版 SDK。
