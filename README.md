@@ -92,6 +92,8 @@ hhh-im-check dist/stage/hhh-im-provider.json
 
 Slack 已生成的多档缩略图用于预览，url_private_download/url_private 对应的原件保留原始格式；视频封面只声明预览。
 
+音频文件仍通过已声明的 `resources.read` 读取原件，保留文件名、MIME 和平台给出的正数 `duration_ms`。宿主可据此原地播放；未知时长留空，不能把普通音频文件按时长或文件名猜成语音消息。原生录音的文件 `subtype=slack_audio` 额外声明 `voice=true`；同名、同时长或带波形的普通文件仍是音频文件。字段定义见 [Slack File object](https://docs.slack.dev/reference/objects/file-object/)。
+
 新宿主经 `resources/describe` 选择实际版本，读取时带 `variant`；省略 `variant` 的旧调用仍按原来的方式读取；二进制安装仍需通过宿主的最低 SDK 检查。分段缓存包含实际版本，不把预览当成原件。本版固定使用 IM SDK v0.16.0，宿主需支持该版 SDK。
 
 ## 合并转发记录

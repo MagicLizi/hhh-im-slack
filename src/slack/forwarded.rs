@@ -144,6 +144,33 @@ pub(super) fn attachment(raw: &Value, depth: usize, used: &mut usize) -> Option<
 mod tests {
     use super::*;
     #[test]
+    fn forwarded_audio_keeps_the_native_voice_fields_and_file_id() {
+        let native: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/slack/native-audio-file.json"
+        ))
+        .unwrap();
+        let file_id = native["id"].as_str().unwrap().to_owned();
+        for raw in [
+            json!({"is_msg_unfurl":true,"message_blocks":[{
+                "ts":"1700000000.000001",
+                "message":{"user":"U1","text":"","files":[native.clone()]}
+            }]}),
+            json!({"is_msg_unfurl":true,"text":"","files":[native]}),
+        ] {
+            let Part::Forwarded(record) = attachment(&raw, 0, &mut 0).unwrap() else {
+                panic!("应保留转发快照")
+            };
+            let Block::Resource { resource, .. } = &record.messages[0].content[0] else {
+                panic!("应保留原生语音资源")
+            };
+            assert!(resource.voice);
+            assert_eq!(resource.duration_ms, Some(2600));
+            assert_eq!(resource.key, file_id);
+            assert_eq!(resource.mime.as_deref(), Some("audio/mp4"));
+        }
+    }
+
+    #[test]
     fn ordinary_unfurls_and_reply_quotes_are_not_forwarded() {
         let mut used = 0;
         assert!(attachment(&json!({"text":"普通网址","blocks":[]}), 0, &mut used).is_none());
