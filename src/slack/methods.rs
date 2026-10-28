@@ -478,6 +478,7 @@ impl SlackClient {
                 },
             };
             items.push(ActivityItem {
+                first_page: None,
                 conversation_id: id,
                 kind: profile.kind,
                 first_ms,
@@ -1090,36 +1091,19 @@ impl SlackClient {
 
     /// 打开一个消息里的文件（契约 client v10 §9）：先查文件资料拿到本人才能下载的地址，再带本人令牌从 `offset` 起下载
     /// （Slack 按段给时从这里起，整份给时从头起，运行时替宿主跳到要的位置）。视频按图片要的是它的封面。
-    pub(crate) async fn open_resource(
+    pub(crate) async fn open_resource_variant(
         &self,
         key: &str,
         kind: ResourceKind,
         offset: u64,
+        variant: Option<&str>,
     ) -> Result<Opened> {
         check_id(key)?;
         if kind == ResourceKind::Sticker {
             return Err(Error::new(ErrorKind::Unsupported, "Slack 没有表情包资源。"));
         }
-        let value = self.query("files.info", &[("file", key)]).await?;
-        let file = value.get("file").cloned().unwrap_or_default();
-        // 视频文件按图片要的是它的封面：视频缩略图 `thumb_video`（契约 client v35 §1.4）。
-        let cover = kind == ResourceKind::Image
-            && translate::is_video_mime(rich::str_of(&file, "mimetype"));
-        let total = if cover {
-            None
-        } else {
-            file.get("size").and_then(Value::as_u64)
-        };
-        let addresses: &[&str] = if cover {
-            &["thumb_video"]
-        } else {
-            &["url_private_download", "url_private"]
-        };
-        let address = addresses
-            .iter()
-            .map(|key| rich::str_of(&file, key))
-            .find(|url| !url.is_empty())
-            .ok_or_else(|| Error::new(ErrorKind::NotFound, "Slack 没有给出这个文件的下载地址。"))?;
+        let file = self.file_details(key).await?;
+        let (address, total) = super::resource_variants::address(&file, kind, variant)?;
         let url = Url::parse(address)
             .ok()
             .filter(|url| {
@@ -1156,6 +1140,11 @@ impl SlackClient {
             };
             return Err(errors::from_slack(name, status, None));
         }
+        let total = if status == 200 {
+            response.content_length().or(total)
+        } else {
+            total
+        };
         // 206 是从要的位置起给的；200 是整份（没认 Range），运行时从头跳过去。
         let start = if status == 206 { offset } else { 0 };
         Ok(Opened {

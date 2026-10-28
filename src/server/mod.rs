@@ -174,6 +174,7 @@ impl Plugin for Server {
             Method::ReactionsList => with_params(value, |p| self.reactions_list(p)).await,
             Method::EmojiCatalog => self.emoji_catalog().await,
             Method::EmojiImage => with_params(value, |p| self.emoji_image(p)).await,
+            Method::ResourcesDescribe => with_params(value, |p| self.resources_describe(p)).await,
             Method::ResourcesRead => with_params(value, |p| self.resources_read(p)).await,
             Method::AvatarsRead => with_params(value, |p| self.avatars_read(p)).await,
             Method::UploadsBegin => params(value).and_then(|p| self.transfers.uploads.begin(p)),
@@ -219,6 +220,7 @@ impl Plugin for Server {
             | Method::ActionFailed
             | Method::HostUserName
             | Method::PerfReport => Err(runtime::method_not_found(&method)),
+            _ => Err(runtime::method_not_found(&method)),
         };
         Reply::from(result)
     }

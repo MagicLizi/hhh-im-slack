@@ -67,7 +67,7 @@
 
 1. `cargo build --release`、`cargo test`、`cargo fmt --check`、`cargo clippy --all-targets` 全部通过（零警告）。
 2. 打包后自检：`powershell -File scripts/pack.ps1`，再跑 `hhh-im-check dist/stage/hhh-im-provider.json`，全部通过。
-   自检工具没装时：`cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.10.0 hhh-im-protocol --features transport,package`。
+   自检工具没装时：`cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.14.0 hhh-im-protocol --features transport,package`。
 3. 在 HHH 里试一遍：设置 → IM → 添加 IM → 文件夹，选 `dist/stage`。登录、读、发、续期都走一遍。
 
 ## 清单 `hhh-im-provider.json`

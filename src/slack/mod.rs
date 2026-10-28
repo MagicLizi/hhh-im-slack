@@ -16,6 +16,7 @@ pub(crate) mod methods;
 pub(crate) mod mrkdwn;
 mod names;
 pub(crate) mod parts;
+mod resource_variants;
 mod rich;
 mod rich_send;
 pub(crate) mod translate;
@@ -178,6 +179,7 @@ pub struct SlackClient {
     account: SlackAccount,
     scopes: Vec<String>,
     caches: Arc<Caches>,
+    resource_files: resource_variants::FileDetails,
 }
 
 /// 读下来的工作区成员名单。`next` 有值时还没读全：上次读到这一页被限流了。
@@ -280,6 +282,7 @@ impl SlackClient {
         Ok(Self {
             api,
             download: api::download_client()?,
+            resource_files: Default::default(),
             grant,
             account,
             scopes,

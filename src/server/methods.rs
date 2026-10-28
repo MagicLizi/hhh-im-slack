@@ -244,21 +244,32 @@ impl Server {
     }
 
     /// `resources/read`：同一个资源顺着读复用一条读流；文件从要的位置读（Range），读不了就从头读、运行时跳过去。
+    pub(crate) async fn resources_describe(
+        &self,
+        params: pm::ResourcesDescribeParams,
+    ) -> Result<Value, RpcError> {
+        self.with_ready_client(|client| async move {
+            client.describe_resource(&params.key, params.kind).await
+        })
+        .await
+        .map(to_value)
+    }
+
     pub(crate) async fn resources_read(
         &self,
         params: pm::ResourcesReadParams,
     ) -> Result<Value, RpcError> {
-        let key = format!(
-            "resource\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{:?}",
-            params.conversation_id, params.message_id, params.key, params.kind
-        );
+        let key = params.segment_key();
+        let variant = params.variant.clone();
         let (resource, kind) = (params.key.clone(), params.kind);
         let chunk = self
             .transfers
             .segments
             .read(key, params.offset, params.length, |offset| async move {
                 self.with_ready_client(|client| async move {
-                    client.open_resource(&resource, kind, offset).await
+                    client
+                        .open_resource_variant(&resource, kind, offset, variant.as_deref())
+                        .await
                 })
                 .await
             })

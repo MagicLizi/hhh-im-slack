@@ -34,7 +34,8 @@
     "recall": true,
     "resources": {
       "avatars": true,
-      "read": true
+      "read": true,
+      "variants": true
     },
     "retranslate": false,
     "richSend": {

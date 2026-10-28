@@ -25,7 +25,7 @@ Slack 的登录，不用重新登录。
 
 ## 构建
 
-格式发送使用公开 SDK `v0.12.0` 的 `Outgoing::Rich` 与 `capabilities.richSend`，需要带 IM SDK 0.12.0 或更新版本的 HHH。构建固定公开标签，不依赖本地源码替换。读取额度仍保留旧宿主的兼容路径。
+格式发送使用公开 SDK `v0.14.0` 的 `Outgoing::Rich` 与 `capabilities.richSend`，本版需要带 IM SDK 0.14.0 或更新版本的 HHH。构建固定公开标签，不依赖本地源码替换。读取额度保留省略声明时的兼容路径。
 
 ```sh
 cargo build --release
@@ -43,7 +43,7 @@ cargo clippy --all-targets
 装自检和打包工具：
 
 ```sh
-cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.12.0 hhh-im-protocol --features transport,package
+cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.14.0 hhh-im-protocol --features transport,package
 ```
 
 打包后自检，全部通过才算改好：
@@ -84,3 +84,9 @@ hhh-im-check dist/stage/hhh-im-provider.json
 ## 许可证
 
 [MIT](LICENSE)
+
+## 图片的预览与原件
+
+Slack 已生成的多档缩略图用于预览，url_private_download/url_private 对应的原件保留原始格式；视频封面只声明预览。
+
+新宿主经 `resources/describe` 选择实际版本，读取时带 `variant`；省略 `variant` 的旧调用仍按原来的方式读取；二进制安装仍需通过宿主的最低 SDK 检查。分段缓存包含实际版本，不把预览当成原件。本版固定使用 IM SDK v0.14.0，宿主需支持该版 SDK。
