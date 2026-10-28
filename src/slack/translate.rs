@@ -199,7 +199,7 @@ pub(crate) fn message(conversation: &str, raw: &Value) -> Result<SlackMessage> {
     });
     Ok(SlackMessage {
         message: Message {
-            read_position: None,
+            read_position: super::reading::position(ts),
             id: ts.to_owned(),
             conversation_id: conversation.to_owned(),
             sender,

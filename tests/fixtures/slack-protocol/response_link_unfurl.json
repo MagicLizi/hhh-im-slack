@@ -73,6 +73,7 @@
   "createdAtMs": 1759000006000,
   "id": "1759000006.000006",
   "reactions": [],
+  "readPosition": "1759000006000006",
   "sender": {
     "id": "U000000001",
     "idType": "user_id",

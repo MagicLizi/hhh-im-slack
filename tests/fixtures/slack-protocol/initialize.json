@@ -32,6 +32,10 @@
       "list": true,
       "remove": true
     },
+    "readSync": {
+      "conversations": true,
+      "watermark": true
+    },
     "recall": true,
     "resources": {
       "avatars": true,

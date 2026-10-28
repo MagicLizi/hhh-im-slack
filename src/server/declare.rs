@@ -150,8 +150,15 @@ pub(crate) fn capabilities() -> Capabilities {
     Capabilities {
         receipts: None,
         mark_read: None,
-        read_sync: None,
         stickers: Default::default(),
+        read_sync: Some(hhh_im_protocol::reading::ReadSyncCaps {
+            scopes: hhh_im_protocol::reading::ReadScopes {
+                conversations: true,
+                threads: false,
+            },
+            watermark: true,
+            individual: false,
+        }),
         conversations: ConversationCaps {
             list: true,
             search: true,
