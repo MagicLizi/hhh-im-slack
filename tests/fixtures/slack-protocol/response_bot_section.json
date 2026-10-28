@@ -106,6 +106,7 @@
   "createdAtMs": 1759000012000,
   "id": "1759000012.000012",
   "reactions": [],
+  "readPosition": "1759000012000012",
   "sender": {
     "id": "B000000002",
     "idType": "bot_id",

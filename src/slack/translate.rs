@@ -199,6 +199,7 @@ pub(crate) fn message(conversation: &str, raw: &Value) -> Result<SlackMessage> {
     });
     Ok(SlackMessage {
         message: Message {
+            read_position: super::reading::position(ts),
             id: ts.to_owned(),
             conversation_id: conversation.to_owned(),
             sender,
@@ -442,6 +443,7 @@ fn file_content(file: &Value) -> Part {
         .find(|n| !n.is_empty())
         .map(str::to_owned);
     let mut resource = Resource {
+        voice: false,
         key: id.to_owned(),
         kind,
         mime: (!mime.is_empty()).then(|| mime.to_owned()),

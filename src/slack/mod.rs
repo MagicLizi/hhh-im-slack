@@ -16,6 +16,7 @@ pub(crate) mod methods;
 pub(crate) mod mrkdwn;
 mod names;
 pub(crate) mod parts;
+mod reading;
 mod resource_variants;
 mod rich;
 mod rich_send;

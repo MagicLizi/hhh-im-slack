@@ -20,12 +20,13 @@ Slack 的登录，不用重新登录。
 - **发送与动作**：在话题里回复、同时发到频道、@某人与 @所有人、发图片和文件、编辑、撤回、加表情回应、去掉表情回应。
 - **格式发送与编辑**：粗体、斜体、删除线、行内代码、链接、列表、引用和代码块转成原生 `rich_text`；表情与提及保留结构，编辑草稿保留可完整写回的格式。Slack 不声明下划线。
 - **资源**：图片、文件、头像、表情图都分段交给 HHH。
+- **本人阅读位置**：按会话读取平台给出的精确 `last_read`，缺失时保持未知；本轮不声明写回或独立话题回读。Slack 没有他人阅读回执，不显示“对方已读”。
 
 聊天记录、凭据和配置都由 HHH 保存，插件自己不存。
 
 ## 构建
 
-格式发送使用公开 SDK `v0.14.0` 的 `Outgoing::Rich` 与 `capabilities.richSend`，本版需要带 IM SDK 0.14.0 或更新版本的 HHH。构建固定公开标签，不依赖本地源码替换。读取额度保留省略声明时的兼容路径。
+格式发送使用 SDK 的 `Outgoing::Rich` 与 `capabilities.richSend`。阅读扩展使用公开 SDK `v0.16.0` 的固定标签；构建不需要本地源码覆盖。安装与运行需要支持 IM SDK 0.16.0 或更新版本的 HHH。读取额度保留省略声明时的兼容路径。
 
 ```sh
 cargo build --release
@@ -43,7 +44,7 @@ cargo clippy --all-targets
 装自检和打包工具：
 
 ```sh
-cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.14.0 hhh-im-protocol --features transport,package
+cargo install --git https://github.com/MagicLizi/hhh-im-sdk --tag v0.16.0 hhh-im-protocol --features transport,package
 ```
 
 打包后自检，全部通过才算改好：
@@ -89,4 +90,4 @@ hhh-im-check dist/stage/hhh-im-provider.json
 
 Slack 已生成的多档缩略图用于预览，url_private_download/url_private 对应的原件保留原始格式；视频封面只声明预览。
 
-新宿主经 `resources/describe` 选择实际版本，读取时带 `variant`；省略 `variant` 的旧调用仍按原来的方式读取；二进制安装仍需通过宿主的最低 SDK 检查。分段缓存包含实际版本，不把预览当成原件。本版固定使用 IM SDK v0.14.0，宿主需支持该版 SDK。
+新宿主经 `resources/describe` 选择实际版本，读取时带 `variant`；省略 `variant` 的旧调用仍按原来的方式读取；二进制安装仍需通过宿主的最低 SDK 检查。分段缓存包含实际版本，不把预览当成原件。本版固定使用 IM SDK v0.16.0，宿主需支持该版 SDK。

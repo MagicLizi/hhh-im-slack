@@ -217,6 +217,7 @@
   "id": "1759000007.000007",
   "incomplete": true,
   "reactions": [],
+  "readPosition": "1759000007000007",
   "sender": {
     "id": "U000000009",
     "idType": "user_id",
