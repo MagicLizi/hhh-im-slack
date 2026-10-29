@@ -500,7 +500,15 @@ async fn logging_in_claims_the_code_from_the_relay_and_exchanges_it_with_pkce() 
         query["redirect_uri"],
         format!("{}/hhh-friend-im/slack/callback", relay_base(&slack))
     );
-    assert_eq!(query["user_scope"], hhh_im_slack::USER_SCOPES.join(","));
+    assert_eq!(
+        query["user_scope"],
+        hhh_im_slack::USER_SCOPES
+            .iter()
+            .copied()
+            .chain(["channels:write", "groups:write", "im:write", "mpim:write"])
+            .collect::<Vec<_>>()
+            .join(",")
+    );
     assert_eq!(query["code_challenge_method"], "S256");
 
     let saved = host.expect_save(true).await;

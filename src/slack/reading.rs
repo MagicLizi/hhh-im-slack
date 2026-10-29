@@ -1,6 +1,9 @@
 //! 本人的阅读水位，不表示他人读过消息。缺少 last_read 时保持未知。
 use super::*;
-use hhh_im_protocol::reading::{ReadState, ReadSyncParams, valid_read_ids, valid_read_scope};
+use hhh_im_protocol::reading::{
+    MarkReadParams, MarkReadResult, ReadState, ReadSyncParams, compare_read_positions,
+    valid_read_ids, valid_read_scope,
+};
 
 pub(crate) fn position(ts: &str) -> Option<String> {
     if ts == "0" {
@@ -23,6 +26,109 @@ pub(crate) fn position(ts: &str) -> Option<String> {
 }
 
 impl SlackClient {
+    pub(crate) async fn reading_mark(&self, params: &MarkReadParams) -> Result<MarkReadResult> {
+        if !valid_read_scope(&params.scope) {
+            return Err(Error::new(
+                ErrorKind::InvalidRequest,
+                "阅读写回范围不正确。",
+            ));
+        }
+        check_id(&params.scope.conversation_id)?;
+        if params.scope.thread_root.is_some() {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "Slack 官方接口尚未提供可核实的独立话题阅读写回。",
+            ));
+        }
+        let target = position(&params.message_id)
+            .filter(|p| p != "0")
+            .ok_or_else(|| Error::new(ErrorKind::InvalidRequest, "消息阅读位置格式不正确。"))?;
+        if params.position.as_deref().is_some_and(|p| p != target) {
+            return Err(Error::new(
+                ErrorKind::InvalidRequest,
+                "消息与阅读位置不一致。",
+            ));
+        }
+        let current = self
+            .reading_sync(&ReadSyncParams {
+                scope: params.scope.clone(),
+                message_ids: Vec::new(),
+            })
+            .await?;
+        if current
+            .through
+            .as_deref()
+            .is_some_and(|p| compare_read_positions(p, &target).is_ge())
+        {
+            return Ok(MarkReadResult::Applied);
+        }
+        let page = self
+            .query(
+                "conversations.history",
+                &[
+                    ("channel", &params.scope.conversation_id),
+                    ("oldest", &params.message_id),
+                    ("latest", &params.message_id),
+                    ("inclusive", "true"),
+                    ("limit", "1"),
+                ],
+            )
+            .await?;
+        let exact = page["messages"].as_array().is_some_and(|messages| {
+            messages.len() == 1
+                && messages[0]["ts"].as_str() == Some(params.message_id.as_str())
+                && messages[0]
+                    .get("thread_ts")
+                    .and_then(Value::as_str)
+                    .is_none_or(|root| root == params.message_id)
+        });
+        if !exact {
+            return Err(Error::new(
+                ErrorKind::InvalidRequest,
+                "无法确认这条消息属于当前会话，未写入。",
+            ));
+        }
+        match self
+            .write(
+                "conversations.mark",
+                &[
+                    ("channel", &params.scope.conversation_id),
+                    ("ts", &params.message_id),
+                ],
+            )
+            .await
+        {
+            Ok(_) => {}
+            Err(error)
+                if error.kind == ErrorKind::Disconnected
+                    || error.kind == ErrorKind::ProtocolError =>
+            {
+                return Ok(MarkReadResult::Unknown);
+            }
+            Err(error) => return Err(error),
+        }
+        // 写入只发一次。后续查询失败或未确认时保留 unknown，不重放写入。
+        Ok(
+            match self
+                .reading_sync(&ReadSyncParams {
+                    scope: params.scope.clone(),
+                    message_ids: Vec::new(),
+                })
+                .await
+            {
+                Ok(state)
+                    if state
+                        .through
+                        .as_deref()
+                        .is_some_and(|p| compare_read_positions(p, &target).is_ge()) =>
+                {
+                    MarkReadResult::Applied
+                }
+                _ => MarkReadResult::Unknown,
+            },
+        )
+    }
+
     pub(crate) async fn reading_sync(&self, params: &ReadSyncParams) -> Result<ReadState> {
         if !valid_read_scope(&params.scope) || !valid_read_ids(&params.message_ids) {
             return Err(Error::new(

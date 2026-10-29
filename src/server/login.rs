@@ -182,6 +182,7 @@ impl Server {
                     redirect_uri: relay.callback_url(),
                     scopes: USER_SCOPES
                         .iter()
+                        .chain(crate::slack::READING_SCOPES.iter())
                         .map(|scope| (*scope).to_owned())
                         .collect(),
                 },
