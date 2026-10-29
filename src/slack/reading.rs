@@ -137,11 +137,41 @@ impl SlackClient {
             ));
         }
         check_id(&params.scope.conversation_id)?;
-        if params.scope.thread_root.is_some() {
-            return Err(Error::new(
-                ErrorKind::Unsupported,
-                "尚未核实本授权的独立话题阅读位置。",
-            ));
+        if let Some(root) = params.scope.thread_root.as_deref() {
+            if position(root).is_none_or(|value| value == "0") {
+                return Err(Error::new(
+                    ErrorKind::InvalidRequest,
+                    "话题根消息格式不正确。",
+                ));
+            }
+            // 公开 conversations.replies 的根消息含本人的 last_read；缺省保持未知。
+            let page = self
+                .query(
+                    "conversations.replies",
+                    &[
+                        ("channel", &params.scope.conversation_id),
+                        ("ts", root),
+                        ("limit", "1"),
+                    ],
+                )
+                .await?;
+            let message = page["messages"]
+                .as_array()
+                .and_then(|messages| {
+                    messages
+                        .iter()
+                        .find(|message| message["ts"].as_str() == Some(root))
+                })
+                .filter(|message| {
+                    message
+                        .get("thread_ts")
+                        .and_then(Value::as_str)
+                        .is_none_or(|id| id == root)
+                })
+                .ok_or_else(|| {
+                    Error::new(ErrorKind::ProtocolError, "阅读信息不属于查询的话题。")
+                })?;
+            return read_state(params, message.get("last_read"));
         }
         let value = self
             .query(
@@ -156,18 +186,22 @@ impl SlackClient {
                 "阅读信息不属于查询的会话。",
             ));
         }
-        let through = match channel.get("last_read") {
-            None | Some(Value::Null) => None,
-            Some(Value::String(ts)) => Some(
-                position(ts)
-                    .ok_or_else(|| Error::new(ErrorKind::ProtocolError, "阅读位置格式不正确。"))?,
-            ),
-            _ => return Err(Error::new(ErrorKind::ProtocolError, "阅读位置格式不正确。")),
-        };
-        Ok(ReadState {
-            scope: params.scope.clone(),
-            through,
-            read_message_ids: Vec::new(),
-        })
+        read_state(params, channel.get("last_read"))
     }
+}
+
+fn read_state(params: &ReadSyncParams, cursor: Option<&Value>) -> Result<ReadState> {
+    let through = match cursor {
+        None | Some(Value::Null) => None,
+        Some(Value::String(ts)) => Some(
+            position(ts)
+                .ok_or_else(|| Error::new(ErrorKind::ProtocolError, "阅读位置格式不正确。"))?,
+        ),
+        _ => return Err(Error::new(ErrorKind::ProtocolError, "阅读位置格式不正确。")),
+    };
+    Ok(ReadState {
+        scope: params.scope.clone(),
+        through,
+        read_message_ids: Vec::new(),
+    })
 }
