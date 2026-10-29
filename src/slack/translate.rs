@@ -451,16 +451,28 @@ fn file_content(file: &Value) -> Part {
         .find(|n| !n.is_empty())
         .map(str::to_owned);
     let mut resource = Resource {
-        voice: false,
         key: id.to_owned(),
         kind,
         mime: (!mime.is_empty()).then(|| mime.to_owned()),
         bytes: None,
         duration_ms: None,
+        voice: false,
         cover: None,
     };
     // 图片的宽高不给（同内置：显示宽高由宿主下载后量）；视频给画面宽高。
     let (mut width, mut height) = (None, None);
+    if kind == ResourceKind::File
+        && mime
+            .get(..6)
+            .is_some_and(|head| head.eq_ignore_ascii_case("audio/"))
+    {
+        resource.duration_ms = file
+            .get("duration_ms")
+            .and_then(Value::as_u64)
+            .filter(|ms| *ms > 0);
+        // 原生录音取样：文件自己的 subtype 明确为 slack_audio，不按名称或波形猜。
+        resource.voice = str_of(file, "subtype") == "slack_audio";
+    }
     if kind == ResourceKind::File && is_video_mime(mime) {
         let video = video_of(file, id);
         resource.duration_ms = video.duration_ms;
@@ -856,6 +868,70 @@ mod tests {
             panic!()
         };
         assert_eq!((audio.cover.as_ref(), *width), (None, None));
+    }
+
+    #[test]
+    fn native_audio_uses_only_the_explicit_file_subtype() {
+        // 2026-10-28 用户在 hhh-test 发送的原生语音，原始文件对象已脱敏。
+        let native: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/slack/native-audio-file.json"
+        ))
+        .unwrap();
+        for subtype in [Some("slack_audio"), None, Some("other")] {
+            let mut file = native.clone();
+            if let Some(subtype) = subtype {
+                file["subtype"] = json!(subtype);
+            } else {
+                file.as_object_mut().unwrap().remove("subtype");
+            }
+            let posted = translate(
+                json!({"type":"message","user":"U01","ts":"1759120000.000100","text":"","files":[file]}),
+            );
+            let Part::Resource { resource, .. } = &posted.parts[0] else {
+                panic!("不是音频资源")
+            };
+            assert_eq!(resource.voice, subtype == Some("slack_audio"));
+            assert_eq!(resource.duration_ms, Some(2600));
+            assert_eq!(resource.mime.as_deref(), Some("audio/mp4"));
+            assert!(resource.cover.is_none());
+            let wire = posted.wire(Some("U01"));
+            let restored: hhh_im_protocol::types::Message =
+                serde_json::from_value(serde_json::to_value(&wire).unwrap()).unwrap();
+            assert_eq!(restored, wire);
+        }
+    }
+
+    #[test]
+    fn audio_files_keep_reported_duration_without_becoming_video() {
+        for (reported, expected) in [
+            (json!(8200), Some(8200)),
+            (json!(0), None),
+            (json!(-1), None),
+            (Value::Null, None),
+        ] {
+            let posted = translate(
+                json!({"type":"message","user":"U01","ts":"1759120000.000100","text":"","files":[
+                    {"id":"F01","mode":"hosted","mimetype":"audio/mpeg","name":"recording.mp3","duration_ms":reported}
+                ]}),
+            );
+            let Part::Resource {
+                resource,
+                name,
+                width,
+                height,
+                ..
+            } = &posted.parts[0]
+            else {
+                panic!("音频文件没有保留资源")
+            };
+            assert_eq!(resource.kind, ResourceKind::File);
+            assert_eq!(resource.mime.as_deref(), Some("audio/mpeg"));
+            assert_eq!(resource.duration_ms, expected);
+            assert!(!resource.voice);
+            assert!(resource.cover.is_none());
+            assert_eq!((*width, *height), (None, None));
+            assert_eq!(name.as_deref(), Some("recording.mp3"));
+        }
     }
 
     #[test]
