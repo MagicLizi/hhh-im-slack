@@ -148,7 +148,6 @@ pub(crate) fn platform() -> PlatformDesc {
 /// 能力：内置 Slack 做得到的都声明；不推送（今天的 Slack 靠定时读）。
 pub(crate) fn capabilities() -> Capabilities {
     Capabilities {
-        stickers: Default::default(),
         receipts: None,
         mark_read: Some(hhh_im_protocol::reading::MarkReadCaps {
             scopes: hhh_im_protocol::reading::ReadScopes {
@@ -157,6 +156,7 @@ pub(crate) fn capabilities() -> Capabilities {
             },
             per_minute: 12,
         }),
+        stickers: Default::default(),
         read_sync: Some(hhh_im_protocol::reading::ReadSyncCaps {
             scopes: hhh_im_protocol::reading::ReadScopes {
                 conversations: true,
@@ -175,7 +175,7 @@ pub(crate) fn capabilities() -> Capabilities {
         messages: MessageCaps {
             list: true,
             get: true,
-            forwarded: false,
+            forwarded: true,
         },
         // 机器人按编号读（`bots.info`）；一批取到人名册一次查询的上限，整份成员名单读一遍就认出一大批人。
         people: PeopleCaps {
