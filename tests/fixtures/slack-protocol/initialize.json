@@ -66,6 +66,10 @@
     },
     "session": {
       "renew": true
+    },
+    "markRead": {
+      "conversations": true,
+      "perMinute": 12
     }
   },
   "loginMethods": [

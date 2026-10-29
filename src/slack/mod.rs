@@ -72,6 +72,9 @@ pub const USER_SCOPES: &[&str] = &[
     "usergroups:read",
 ];
 
+/// 新登录申请阅读写回权限；旧授权缺少它们不影响原有收发。
+pub const READING_SCOPES: &[&str] = &["channels:write", "groups:write", "im:write", "mpim:write"];
+
 /// 新版搜索要的本人权限（契约 client v29 §2）：四种会话各一项。后台会话发现改由宿主逐会话探测、不再声明
 /// `conversations/recentActivity`，登录也不再申请这几项（不在 [`USER_SCOPES`] 里，缺了不提示重新授权）。
 pub const SEARCH_SCOPES: &[&str] = &[

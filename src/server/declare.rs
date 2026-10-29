@@ -149,7 +149,13 @@ pub(crate) fn platform() -> PlatformDesc {
 pub(crate) fn capabilities() -> Capabilities {
     Capabilities {
         receipts: None,
-        mark_read: None,
+        mark_read: Some(hhh_im_protocol::reading::MarkReadCaps {
+            scopes: hhh_im_protocol::reading::ReadScopes {
+                conversations: true,
+                threads: false,
+            },
+            per_minute: 12,
+        }),
         stickers: Default::default(),
         read_sync: Some(hhh_im_protocol::reading::ReadSyncCaps {
             scopes: hhh_im_protocol::reading::ReadScopes {

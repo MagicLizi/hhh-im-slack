@@ -172,6 +172,7 @@ impl Plugin for Server {
             Method::MessagesList => with_params(value, |p| self.messages_list(p)).await,
             Method::MessagesGet => with_params(value, |p| self.messages_get(p)).await,
             Method::ReadingSync => with_params(value, |p| self.reading_sync(p)).await,
+            Method::ReadingMark => with_params(value, |p| self.reading_mark(p)).await,
             Method::ReactionsList => with_params(value, |p| self.reactions_list(p)).await,
             Method::EmojiCatalog => self.emoji_catalog().await,
             Method::EmojiImage => with_params(value, |p| self.emoji_image(p)).await,
