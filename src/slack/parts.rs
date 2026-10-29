@@ -18,6 +18,8 @@ pub(crate) enum Part {
     Rich(Vec<RichNode>),
     /// 卡片。
     Card(Card),
+    /// 原生消息转发的只读快照。
+    Forwarded(Box<hhh_im_protocol::types::ForwardedRecord>),
     /// 图片或文件。
     Resource {
         resource: Resource,
@@ -43,6 +45,9 @@ impl Part {
             },
             Self::Rich(nodes) => rich_block(nodes.clone()),
             Self::Card(card) => card_block(card),
+            Self::Forwarded(record) => Block::Forwarded {
+                record: record.clone(),
+            },
             Self::Resource {
                 resource,
                 name,
@@ -67,6 +72,10 @@ impl Part {
         let mut look = |node: &RichNode| found |= matches!(node, RichNode::Unsupported { .. });
         match self {
             Self::Unsupported { .. } => return true,
+            Self::Forwarded(record) => {
+                return record.incomplete
+                    || record.messages.iter().any(|message| message.incomplete);
+            }
             Self::Rich(nodes) => walk(nodes, &mut look),
             Self::Card(card) => walk_card(&card.blocks, &mut look),
             _ => {}
