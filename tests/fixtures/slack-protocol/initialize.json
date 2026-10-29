@@ -167,7 +167,7 @@
   "provider": {
     "id": "slack",
     "name": "Slack",
-    "version": "1.0.11"
+    "version": "1.0.12"
   },
   "readRequestGating": true,
   "settings": []
