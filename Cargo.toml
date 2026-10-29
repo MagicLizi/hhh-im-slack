@@ -1,6 +1,6 @@
 [package]
 name = "hhh-im-slack"
-version = "1.0.9"
+version = "1.0.10"
 edition = "2024"
 publish = false
 license = "MIT"
