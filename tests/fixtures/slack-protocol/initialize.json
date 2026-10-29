@@ -34,6 +34,7 @@
     },
     "readSync": {
       "conversations": true,
+      "threads": true,
       "watermark": true
     },
     "recall": true,

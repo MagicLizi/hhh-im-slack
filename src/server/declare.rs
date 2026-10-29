@@ -160,7 +160,7 @@ pub(crate) fn capabilities() -> Capabilities {
         read_sync: Some(hhh_im_protocol::reading::ReadSyncCaps {
             scopes: hhh_im_protocol::reading::ReadScopes {
                 conversations: true,
-                threads: false,
+                threads: true,
             },
             watermark: true,
             individual: false,

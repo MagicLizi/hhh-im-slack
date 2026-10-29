@@ -43,7 +43,7 @@ async fn reading_sync_preserves_precise_position_and_keeps_missing_position_unkn
 }
 
 #[tokio::test]
-async fn reading_sync_rejects_foreign_or_malformed_watermarks_and_threads() {
+async fn reading_sync_rejects_foreign_or_malformed_watermarks() {
     for channel in [
         json!({"id":"C000000098","last_read":"1790000000.000100"}),
         json!({"id":"C000000099","last_read":1_790_000_000.000_1}),
@@ -65,8 +65,67 @@ async fn reading_sync_rejects_foreign_or_malformed_watermarks_and_threads() {
             )
             .await;
         assert_eq!(kind_of(&error), ErrorKind::ProtocolError);
-        let error = host.err("reading/sync", json!({"scope":{"conversationId":"C000000099","threadRoot":"1790000000.000100"},"messageIds":[]})).await;
+    }
+}
+
+#[tokio::test]
+async fn thread_sync_uses_only_the_public_root_read_cursor() {
+    for (last, expected) in [
+        (Some(json!("1790000000.000102")), Some("1790000000000102")),
+        (None, None),
+        (Some(serde_json::Value::Null), None),
+    ] {
+        let slack = MockServer::start().await;
+        let host = online(&slack).await;
+        let mut root = json!({"ts":"1790000000.000100","thread_ts":"1790000000.000100","subscribed":true,"latest_reply":"1790000000.000199"});
+        if let Some(last) = last {
+            root["last_read"] = last;
+        }
+        Mock::given(method("POST"))
+            .and(path("/api/conversations.replies"))
+            .and(body_string_contains("channel=C000000099"))
+            .and(body_string_contains("ts=1790000000.000100"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(json!({"ok":true,"messages":[root]})),
+            )
+            .expect(1)
+            .mount(&slack)
+            .await;
+        let scope = json!({"conversationId":"C000000099","threadRoot":"1790000000.000100"});
+        let state = host
+            .ok("reading/sync", json!({"scope":scope,"messageIds":[]}))
+            .await;
+        assert_eq!(state["scope"], scope);
+        assert_eq!(state["through"].as_str(), expected);
+        let error = host
+            .err(
+                "reading/mark",
+                json!({"scope":scope,"messageId":"1790000000.000102"}),
+            )
+            .await;
         assert_eq!(kind_of(&error), ErrorKind::Unsupported);
+    }
+}
+
+#[tokio::test]
+async fn thread_sync_rejects_wrong_roots_and_malformed_cursors() {
+    for row in [
+        json!({"ts":"1790000000.000101","last_read":"1790000000.000102"}),
+        json!({"ts":"1790000000.000100","thread_ts":"1790000000.000099","last_read":"1790000000.000102"}),
+        json!({"ts":"1790000000.000100","last_read":123}),
+        json!({"ts":"1790000000.000100","last_read":"1790000000.1"}),
+    ] {
+        let slack = MockServer::start().await;
+        let host = online(&slack).await;
+        Mock::given(method("POST"))
+            .and(path("/api/conversations.replies"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(json!({"ok":true,"messages":[row]})),
+            )
+            .mount(&slack)
+            .await;
+        let error=host.err("reading/sync",json!({"scope":{"conversationId":"C000000099","threadRoot":"1790000000.000100"},"messageIds":[]})).await;
+        assert_eq!(kind_of(&error), ErrorKind::ProtocolError);
     }
 }
 
